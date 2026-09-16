@@ -5,6 +5,7 @@ import { listNotificationPrefs } from '@/lib/data/queries'
 import { ProfileForm } from '@/components/settings/ProfileForm'
 import { ThemePicker } from '@/components/settings/ThemePicker'
 import { NotificationPrefs } from '@/components/settings/NotificationPrefs'
+import { ChangePassword } from '@/components/account/ChangePassword'
 import { KamCard } from '@/components/partner/KamCard'
 import { PageHead } from '@/components/shell/PageHead'
 import { Badge, Card, CardHead, Problem } from '@/components/ui'
@@ -26,12 +27,19 @@ import { Badge, Card, CardHead, Problem } from '@/components/ui'
  *
  * - **GSTIN** (§13.1). Adding one changes which orders roll up into the reward
  *   base, so it goes through an admin. On the profile form above.
+ *
+ * **Sign-in** is the fifth, and it is not in §13. Every partner login on this
+ * platform begins as a password a Material Depot admin generated and sent over
+ * WhatsApp, and since `006_credentials.sql` the console keeps that password
+ * until it is changed. There was nowhere in the partner app to change it. A
+ * retention with no exit is not a retention, it is a copy.
  */
 const TABS = [
   { key: 'profile', label: 'Studio' },
   { key: 'team', label: 'Team & GST' },
   { key: 'theme', label: 'Appearance' },
   { key: 'notifications', label: 'Notifications' },
+  { key: 'signin', label: 'Sign-in' },
 ] as const
 
 type TabKey = (typeof TABS)[number]['key']
@@ -77,6 +85,9 @@ export default async function SettingsPage({
             )
           ) : null}
           {active === 'team' ? <Team partner={partner} email={email} /> : null}
+          {active === 'signin' ? (
+            <ChangePassword hint="Your login was created by Material Depot and the password was generated for you. Changing it here is what stops anyone there being able to read it." />
+          ) : null}
         </div>
 
         <div className="space-y-5">

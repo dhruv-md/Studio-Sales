@@ -14,6 +14,7 @@ apply a change to it.
 | `003_roles.sql` | `staff_user`, partner lifecycle columns, the order approval gate, onboarding forms, the outreach pipeline, portfolios, partner activity | ☑ 2026-09-15 |
 | `004_roles_rls.sql` | Policies for all of the above, the partner field guard, `review_portfolio_item()`, `my_kam()` (its `review_referral_order()` was replaced by 005) | ☑ 2026-09-15 |
 | `005_studio.sql` | **PRD v1.1.** The columns the incentive formula cannot run without (per-order coupon, discount availed, delivery date), the §9.2 referral form fields and consent, escalations + their thread, theming, notification preferences, the phone-reveal log, Appendix B reason codes, `review_referral()`, `referral_phone_taken()` | ☑ 2026-09-16 |
+| `006_credentials.sql` | **The issued password, kept until its owner changes it.** `issued_credential` (RLS on, no policies, sealed column), the fingerprint + read + reveal functions, and the trigger on `auth.users` that erases the secret on any password change | ☐ |
 | `../seed/001_demo.sql` | Demo data — a firm, 4 clients, 5 projects, boards, quotes, procurement, ledger, referrals, rewards | ☐ |
 | `../seed/002_console.sql` | Demo console data — the team, two more firms, prospects, onboarding forms, portfolios, activity | ☐ |
 
@@ -56,6 +57,25 @@ column, hitting each new table, and calling each new function to see whether it
 404s (missing) or 403s with its own permission message (present and enforcing).
 003 and 004 sat unticked here for a day after they had actually shipped, which
 is the same failure in the other direction.
+
+**006 degrades rather than breaks, and says which.** Until it is pasted, every
+login still gets created and still works — retention is best-effort by design —
+but the modal says *"the password was NOT retained … copy it now"* instead of
+promising it can be found again, and tapping a name returns the error naming
+this file. Nothing silently forgets a password while telling an admin it is
+kept.
+
+Two things to check after pasting it:
+
+- **The trigger on `auth.users`.** Supabase normally allows it (it is the same
+  privilege the `handle_new_user` pattern uses), but if the statement is refused
+  the rest of the file still works: `app_read_credential()` re-checks the
+  password fingerprint on every read and erases the secret itself. The suite
+  asserts both paths separately, so the trigger is a fast path and not the
+  guarantee.
+- **The schema cache.** New functions reach PostgREST on a cache reload. If
+  `app_read_credential` 404s from the app a minute after the paste, run
+  `notify pgrst, 'reload schema';`.
 
 **Applied is not populated.** 005's columns exist and nothing fills them: every
 order is missing `delivered_on` and `discount_availed`, every referral has

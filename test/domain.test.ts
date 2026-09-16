@@ -13,7 +13,7 @@ import { partnerStanding, usageTier, engagement } from '../lib/domain/tiering.ts
 import { attributedSale, pendingSale, rewardStatus } from '../lib/domain/rewards.ts'
 import { cartState, readCart, summariseClients } from '../lib/domain/referrals.ts'
 import { guessMarket, marketLabel } from '../lib/domain/markets.ts'
-import { generatePassword } from '../lib/auth/credentials.ts'
+import { generatePassword, seal, unseal } from '../lib/auth/credentials.ts'
 import {
   MONTHLY_SLABS, QUARTERLY_SLABS, cashbackFor, monthlyPosition, quarterlyPosition,
 } from '../lib/domain/slabs.ts'
@@ -314,6 +314,52 @@ t('long enough, and 1000 in a row are all different', () => {
     seen.add(p)
   }
   assert.equal(seen.size, 1000)
+})
+
+// The password is kept until its owner changes it, and kept SEALED. These four
+// assertions are the whole security claim of `issued_credential` in code form:
+// the column is unreadable without the key, tampering with it fails loudly
+// rather than returning something plausible, and a key that has moved on is a
+// THIRD state — not "they changed it", which is what the console would
+// otherwise tell an admin about a password that still works.
+process.env.CREDENTIAL_KEY = 'a test key, not the service role one'
+
+t('a sealed password comes back exactly, and never looks like itself', () => {
+  const pw = generatePassword()
+  const sealed = seal(pw)
+  assert.ok(!sealed.includes(pw))
+  assert.ok(sealed.startsWith('v1.'))
+  const opened = unseal(sealed)
+  assert.ok(opened.ok && opened.value === pw)
+})
+
+t('the same password seals differently every time', () => {
+  assert.notEqual(seal('Same-Pass-Word-Here'), seal('Same-Pass-Word-Here'))
+})
+
+t('a tampered row does not open', () => {
+  const sealed = seal('Same-Pass-Word-Here')
+  const parts = sealed.split('.')
+  // Flip one byte of the ciphertext. GCM's tag is what turns this into a
+  // failure instead of a plausible-looking wrong answer.
+  const ct = Buffer.from(parts[3], 'base64url')
+  ct[0] ^= 0xff
+  const bad = unseal([parts[0], parts[1], parts[2], ct.toString('base64url')].join('.'))
+  assert.equal(bad.ok, false)
+})
+
+t('a rotated key reads as unreadable, not as no password', () => {
+  const sealed = seal('Same-Pass-Word-Here')
+  process.env.CREDENTIAL_KEY = 'a different key, as after a rotation'
+  const out = unseal(sealed)
+  assert.equal(out.ok, false)
+  assert.ok(!out.ok && /rotated/.test(out.reason))
+  process.env.CREDENTIAL_KEY = 'a test key, not the service role one'
+})
+
+t('a value this app did not write is rejected on shape, not on the key', () => {
+  assert.equal(unseal('not-even-close').ok, false)
+  assert.equal(unseal('v2.a.b.c').ok, false)
 })
 
 // ===========================================================================

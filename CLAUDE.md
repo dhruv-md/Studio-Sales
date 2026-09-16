@@ -21,11 +21,17 @@ orders and issues logins, KAMs, outreach and inbound managers. Read
 Next.js 16 (App Router, Turbopack) + Tailwind 4 + Supabase. Deployed on Vercel
 at <https://b2b-client-dashboard-eight.vercel.app/>.
 
-**This repo is PUBLIC** (`daaku-daddy/B2B-Client-Dashboard`, verified
-2026-09-14). Everything committed is world-readable, so no real partner or
-client names, phone numbers, GSTINs, order values or tokens in code, seeds,
-fixtures, commit messages or docs. `supabase/seed/001_demo.sql` is invented data
-and must stay that way.
+**This repo is PUBLIC** (`dhruv-md/Studio-Sales`, verified 2026-09-16).
+Everything committed is world-readable, so no real partner or client names,
+phone numbers, GSTINs, order values or tokens in code, seeds, fixtures, commit
+messages or docs. `supabase/seed/001_demo.sql` is invented data and must stay
+that way.
+
+**`origin` moved on 2026-09-16.** It was `daaku-daddy/B2B-Client-Dashboard`,
+which still exists with the same history up to `327871e` — so a stale clone, a
+stale Vercel connection or an old PR link can quietly point at a repo that is no
+longer the one being written to. Check `git remote -v` before believing anything
+about where a commit landed.
 
 ```bash
 npm run dev        # next dev — NOTE: :3000 is usually the materialdepot-crm
@@ -40,7 +46,7 @@ cd supabase/test && npm install && npm run all   # the SQL + RLS suite
 There is no lint command. The gate is `npm run typecheck`, `npm run build`,
 `npm run test:domain`, and — for anything touching `supabase/` — the suite in
 `supabase/test`, which runs the migrations and both seeds against a throwaway
-Postgres 18 and asserts **169** things about RLS. **Run all four before claiming
+Postgres 18 and asserts **189** things about RLS. **Run all four before claiming
 a change works.**
 
 And then look at it. Every one of the eighteen bugs in `docs/landmines.md` passed
@@ -55,6 +61,9 @@ job rather than an hour of data entry.
 `supabase/seed/001_demo.sql` are pasted into the Supabase SQL Editor by hand.
 001–004 were applied on 2026-09-11, **005 on 2026-09-16** — verified by probing
 every column, table and function over PostgREST rather than by being told.
+**006 has NOT been pasted yet**: until it is, every login still works and the
+console tells the admin the password was not retained, which is the degraded
+state that migration was written for.
 `supabase/migrations/README.md` is the checklist and says which of the three
 Material Depot Supabase projects this one is.
 
@@ -96,14 +105,15 @@ one address for you.
 | `lib/domain/**` | The rules, and no I/O. Money, quantity, areas, markets, the internal tiering and the per-client rollup — plus the incentive programme: `slabs.ts` (the §10 ladders), `ledger.ts` (attribution, maturation, the statement), `periods.ts` (calendar months in string space), `programme.ts` (**every §17 default, in one file**), `privacy.ts` (§14.5), `reasons.ts` (Appendix B), `theme.ts` (§13.3 + the AA gate). |
 | `lib/analytics/**` | §14.6's single instrumentation layer. **The only place in the app allowed to know a vendor exists** — `docs/analytics.md`. |
 | `lib/data/**` | Partner reads/writes (`queries.ts`, `actions.ts`), console reads/writes (`console-*.ts`), the `Result` type, the session and the role gates. |
-| `lib/auth/credentials.ts` | The one-time password generator. Never stored, never logged. |
+| `lib/auth/credentials.ts` | The one-time password generator, and the AES-GCM seal that keeps it until its owner changes it — `docs/auth.md`. |
 | `components/**` | `ui/` primitives, then one folder per module. `console/` is staff-only and must never be imported from `app/(app)/`. |
-| `app/(app)/settings` | §13 — studio profile, team, theme, notifications. |
+| `app/(app)/settings` | §13 — studio profile, team, theme, notifications, and the Sign-in tab that changes a password. |
+| `app/(console)/console/settings` | A staff member's own account and password. On **every** console role's sidebar, because it is the only way to stop the console being able to read the password you were issued. |
 | `test/domain.test.ts` | The pure rules, asserted at their boundaries — including every published figure of the §10 slab tables. `npm run test:domain`. |
 | `supabase/migrations/**` | The schema and the RLS policies. Pasted by hand. |
 | `supabase/seed/001_demo.sql` | A whole demo firm — 5 projects, boards, quotes, procurement, ledger, referrals, rewards. Idempotent. |
 | `supabase/seed/002_console.sql` | The demo B2B team, two more firms, prospects, onboarding forms, portfolios, activity. |
-| `supabase/test/**` | Migrations + seeds + 169 RLS assertions against a throwaway Postgres. Its deps are deliberately outside the app's `package.json`. |
+| `supabase/test/**` | Migrations + seeds + 189 RLS assertions against a throwaway Postgres. Its deps are deliberately outside the app's `package.json`. |
 
 ## House rules
 
@@ -201,7 +211,7 @@ Module detail lives in `docs/`, read on demand:
 | `docs/roles.md` | **The three kinds of user, the console, market segregation, and the trust boundary. Start here.** |
 | `docs/onboarding.md` | Outreach → the form → admin verification → credentials; the internal Power/Mid/Basic classification |
 | `docs/portfolio.md` | Partner portfolios and the publish gate |
-| `docs/auth.md` | The login model, `onboard_partner`, why not phone OTP yet |
+| `docs/auth.md` | The login model, `onboard_partner`, why not phone OTP yet, and **why the issued password is retained until its owner changes it** |
 | `docs/catalogue.md` | The Material Depot search API, its field names, and the CSRF wall |
 | `docs/design.md` | Rooms, boards, the palette link, how quantities are worked out |
 | `docs/quote.md` | Building a quote, markup, the client PDF, accepting |
@@ -211,10 +221,10 @@ Module detail lives in `docs/`, read on demand:
 | `docs/rewards.md` | **The §10 slab programme** — the two ladders, the formula, maturation, go-live, and why `reward_tier` is not the programme |
 | `docs/escalations.md` | §9.4, and why an open one holds an order's money |
 | `docs/analytics.md` | §14.6 — the one wrapper, the taxonomy, and what is deliberately not wired |
-| `docs/settings.md` | §13 — profile, team, the theme and its WCAG gate, notifications |
+| `docs/settings.md` | §13 — profile, team, the theme and its WCAG gate, notifications, and the Sign-in tab on both apps |
 | `docs/open-questions.md` | What is decided by default and needs a human to confirm |
 | `docs/landmines.md` | **Eighteen bugs already shipped or caught here**, kept because the shape of each recurs. Read before trusting a passing build. |
-| `supabase/test/README.md` | What the 169 assertions cover, the `blocked()` vs `unchanged()` distinction, and the two shim details that are load-bearing |
+| `supabase/test/README.md` | What the 189 assertions cover, the `blocked()` vs `unchanged()` distinction, and the two shim details that are load-bearing |
 
 **When you change behaviour a doc describes, update that doc in the same
 commit.** A doc describing last month's behaviour is worse than no doc, because
@@ -222,8 +232,25 @@ the next session will trust it.
 
 ## Deploying
 
-Vercel project `material-depot1/b2b-client-dashboard`, built from `main` on
-push. `vercel.json` pins `"framework": "nextjs"` **on purpose**: the project was
+Vercel project `material-depot1/b2b-client-dashboard` →
+<https://b2b-client-dashboard-eight.vercel.app>.
+
+**There is NO Git connection on that project, and a push deploys nothing.**
+Checked against the Vercel API on 2026-09-16: `project.link` is null, and the
+old GitHub repo has no webhook. Every deployment so far has been a `vercel --prod`
+from this directory. This file claimed "built from `main` on push" until then,
+which is the more dangerous kind of wrong — it reads as though shipping is done
+and it is not.
+
+Connecting `dhruv-md/Studio-Sales` is blocked on GitHub, not on Vercel: the
+Vercel GitHub App is installed only on the **`daaku-daddy`** account
+(`/v1/integrations/git-namespaces` returns that one namespace), and an
+installation on one user account cannot reach a repo owned by another — so
+`vercel git connect` fails with *"You need admin or write access"* even though
+`dhruv-md` has admin on GitHub. It needs the app installed on the `dhruv-md`
+account: <https://github.com/apps/vercel/installations/new>.
+
+`vercel.json` pins `"framework": "nextjs"` **on purpose**: the project was
 originally created with a static preset and every build failed with *No Output
 Directory named "public" found* even though `next build` had just succeeded.
 Keeping the framework in the repo means a new deployment cannot inherit that
@@ -244,6 +271,7 @@ Four more are **optional and unset**, and the app is correct without them:
 |---|---|---|
 | `NEXT_PUBLIC_B2B_DESK_PHONE` / `_EMAIL` / `_HOURS` | `KamCard`'s fallback when a firm has no KAM assigned (§13.5) | The card says any store can help, rather than printing a desk number. **Deliberate** — an invented number in a live partner app means a partner rings a stranger and concludes the whole product is fake. Set these when the desk exists. |
 | `NEXT_PUBLIC_APP_VERSION` | `app_version` on every analytics event (§14.6.3) | `'dev'`. Harmless until a vendor is connected, at which point every event from production would be stamped `dev`. |
+| `CREDENTIAL_KEY` | The seal on a retained password (`lib/auth/credentials.ts`) | The key is derived from `SUPABASE_SERVICE_ROLE_KEY` instead, so nothing breaks. **Set it before ever rotating that key**: rotation changes the derived key and every password sealed under the old one then reads `unreadable` — honestly labelled, but no longer recoverable. |
 
 There is **no Mixpanel token and no Clarity id**, on purpose — `docs/analytics.md`
 has why, and what adding one costs (one function, one file).

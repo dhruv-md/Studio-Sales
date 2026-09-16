@@ -53,6 +53,11 @@ export const WORKSPACE_ROUTES = PARTNER_WORKSPACE.map((n) => n.href)
  * - **outreach / inbound** — their prospect list and the onboarding form. No
  *   partner directory: an outreach manager works firms that are not on the
  *   platform yet.
+ *
+ * **Settings is on every one of them.** It is the only place somebody can change
+ * the password an admin generated and sent them, and the console holds that
+ * password until they do — so hiding it from three of the four roles would leave
+ * three of the four roles unable to end that.
  */
 const CONSOLE: Record<StaffRole, NavItem[]> = {
   admin: [
@@ -62,21 +67,25 @@ const CONSOLE: Record<StaffRole, NavItem[]> = {
     { href: '/console/partners', label: 'Firms', icon: Building2, blurb: 'Everyone on the platform' },
     { href: '/console/prospects', label: 'Outreach', icon: PhoneCall, blurb: 'Firms we are talking to' },
     { href: '/console/staff', label: 'Team', icon: UsersRound, blurb: 'Who does what, where' },
+    { href: '/console/settings', label: 'Settings', icon: Settings, blurb: 'Your account and password' },
   ],
   kam: [
     { href: '/console', label: 'Today', icon: LayoutDashboard, blurb: 'What is waiting on you' },
     { href: '/console/partners', label: 'My firms', icon: Building2, blurb: 'The firms you look after' },
     { href: '/console/approvals', label: 'Orders', icon: ClipboardCheck, blurb: 'What is waiting on an admin' },
+    { href: '/console/settings', label: 'Settings', icon: Settings, blurb: 'Your account and password' },
   ],
   outreach: [
     { href: '/console', label: 'Today', icon: LayoutDashboard, blurb: 'What is waiting on you' },
     { href: '/console/prospects', label: 'My list', icon: PhoneCall, blurb: 'Firms you are talking to' },
     { href: '/console/applications', label: 'Onboarding', icon: UserPlus, blurb: 'Forms you have filed' },
+    { href: '/console/settings', label: 'Settings', icon: Settings, blurb: 'Your account and password' },
   ],
   inbound: [
     { href: '/console', label: 'Today', icon: LayoutDashboard, blurb: 'What is waiting on you' },
     { href: '/console/prospects', label: 'Enquiries', icon: PhoneCall, blurb: 'Firms that came to us' },
     { href: '/console/applications', label: 'Onboarding', icon: UserPlus, blurb: 'Forms you have filed' },
+    { href: '/console/settings', label: 'Settings', icon: Settings, blurb: 'Your account and password' },
   ],
 }
 

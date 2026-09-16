@@ -9,9 +9,11 @@ import {
 import { Modal } from '@/components/ui/Modal'
 import { EngagementBadge, TierBadge } from './Standing'
 import { CredentialsIssued } from './CredentialsIssued'
+import { CredentialPeek } from './CredentialPeek'
 import { OrderApprovalBadge } from '@/components/referrals/OrderApproval'
 import {
-  logActivity, resetPartnerPassword, updatePartnerAdminFields, type IssuedCredentials,
+  logActivity, readPartnerCredential, resetPartnerPassword, updatePartnerAdminFields,
+  type IssuedCredentials,
 } from '@/lib/data/console-actions'
 import type { PartnerStanding } from '@/lib/domain/tiering'
 import { DORMANT_AFTER_DAYS } from '@/lib/domain/tiering'
@@ -60,6 +62,7 @@ export function PartnerDetail({
   const [pending, start] = useTransition()
   const [noteOpen, setNoteOpen] = useState(false)
   const [creds, setCreds] = useState<IssuedCredentials | null>(null)
+  const [peeking, setPeeking] = useState(false)
 
   const nameOf = (id: string | null) => team.find((s) => s.user_id === id)?.name ?? null
   const clientOf = (refId: string) => referrals.find((r) => r.id === refId)?.client_name ?? '—'
@@ -195,19 +198,12 @@ export function PartnerDetail({
               </Field>
               {isAdmin ? (
                 <div className="flex flex-wrap justify-between gap-2">
-                  <Button
-                    type="button"
-                    disabled={pending}
-                    onClick={() =>
-                      start(async () => {
-                        setError(null)
-                        const res = await resetPartnerPassword(partner.id)
-                        if (!res.ok) return setError(res.error)
-                        setCreds(res.data)
-                      })
-                    }
-                  >
-                    <KeyRound size={14} /> Issue a new password
+                  {/* Look first, issue second. Issuing invalidates whatever the
+                      firm was already sent, and since 006_credentials.sql the
+                      one we sent is usually still readable — so the repair for
+                      "they never got the message" is a copy, not a reset. */}
+                  <Button type="button" onClick={() => setPeeking(true)}>
+                    <KeyRound size={14} /> Their login
                   </Button>
                   <Button type="submit" variant="primary" disabled={pending}>
                     <Save size={14} /> {pending ? 'Saving…' : 'Save'}
@@ -390,6 +386,30 @@ export function PartnerDetail({
 
       <Modal open={creds !== null} onClose={() => setCreds(null)} title="New password issued">
         {creds ? <CredentialsIssued creds={creds} onDone={() => setCreds(null)} /> : null}
+      </Modal>
+
+      <Modal
+        open={peeking}
+        onClose={() => setPeeking(false)}
+        title={`${partner.firm_name}\u2019s login`}
+        hint={partner.email ?? undefined}
+      >
+        {peeking ? (
+          <CredentialPeek
+            load={() => readPartnerCredential(partner.id)}
+            who={partner.firm_name}
+            resetting={pending}
+            onReset={() =>
+              start(async () => {
+                setError(null)
+                const res = await resetPartnerPassword(partner.id)
+                setPeeking(false)
+                if (!res.ok) return setError(res.error)
+                setCreds(res.data)
+              })
+            }
+          />
+        ) : null}
       </Modal>
     </>
   )

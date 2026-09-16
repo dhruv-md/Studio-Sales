@@ -87,6 +87,15 @@ Three smaller decisions worth knowing:
 | `outreach` | one market | Works the list of firms who are not with us yet, and files the onboarding form |
 | `inbound` | every market | Firms that came to us. Same pipeline as outreach today — see the open question below |
 
+**One thing an admin can do that is worth naming.** Since `006_credentials.sql`
+an admin can read back the password *this console issued* to any partner or
+staff member, until that person changes it — from the firm's page, or by tapping
+a name on Team. That is not a read of somebody's chosen password (nobody can do
+that; Supabase keeps a hash) and it is not available to a KAM, to outreach, to
+inbound, or to an admin's own signed-in session against the database. It ends
+the moment the person changes their password, which every role can do from
+Settings. `docs/auth.md` holds the trade and its bounds.
+
 ## Market segregation
 
 `staff_user.market`, `partner.market`, `outreach_prospect.market` and

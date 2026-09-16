@@ -59,3 +59,58 @@ being asked for twice.
 `app_can_write()`, which admits the first two — so a `viewer` can see everything
 the firm has and change none of it. Nothing in the UI creates additional logins
 yet; that is a support action today.
+
+## The issued password is kept until its owner changes it
+
+`006_credentials.sql`, and it is the one place this app deliberately trades
+security for an operational fact.
+
+The old design showed a generated password once and threw it away. What actually
+happened: an admin issues a login, the WhatsApp message does not get sent, and a
+week later the only repair is a **new** password — which invalidates the one the
+firm may already have been given off somebody's screenshot. Two people then
+believe different things about the same account.
+
+So the password is now retained, and bounded as tightly as it can be:
+
+| | |
+|---|---|
+| **Encrypted** | AES-256-GCM. `seal()` / `unseal()` in `lib/auth/credentials.ts`. The key is derived from `SUPABASE_SERVICE_ROLE_KEY` and **never enters Postgres**, so a table dump or a browse through the Supabase dashboard yields `v1.…` and nothing else. |
+| **Unreachable by any session** | `issued_credential` has RLS on and **no policies at all**, and `select` is revoked from `anon` and `authenticated`. An admin's own signed-in session cannot read one row of it. Only the service role, from a server action that has already called `requireStaff(['admin'])`. |
+| **Erased on change** | A trigger on `auth.users` nulls the secret whenever `encrypted_password` changes — our settings page, a Supabase reset email, the dashboard. `app_read_credential()` re-checks the password fingerprint on every read as well, so the guarantee does not depend on the trigger having been created. |
+| **Audited** | Every lookup stamps `revealed_at` / `revealed_by` and counts. |
+
+**What is true and must stay written down: an admin of this console can read the
+password of anyone provisioned since this migration, until they change it.** The
+console says so on the person's own Settings page rather than leaving it implied.
+
+### The four states, and why not two
+
+`readIssuedCredential()` returns `current`, `changed`, `none` or `unreadable`,
+and `CredentialPeek` says a different sentence for each. The two that would be
+easy to collapse are the two that cost something:
+
+- **`changed`** — they set their own password and we erased ours. The system
+  working.
+- **`none`** — we never kept one. Every login issued before this migration, and
+  any where retention failed.
+
+Telling an admin "no password on file" when somebody has simply changed theirs
+invites a reset over a perfectly good account. `unreadable` is the third: a row
+that will not open, which after a service-role key rotation is the expected
+answer and is still not the same as "they changed it". Setting `CREDENTIAL_KEY`
+explicitly decouples the sealing key from the service-role key, and is worth
+doing before ever rotating the latter.
+
+### Changing your own password
+
+`changeMyPassword()` in `lib/data/account-actions.ts`, on both sides:
+**Settings → Sign-in** for a partner and **Settings** in the console. It asks
+for the current password first, verified against a throwaway client that does
+not touch the session cookie — an unlocked laptop in a store should not be
+enough to lock somebody out of their own account.
+
+This is the only exit from retention, which is why the console's Settings page
+is on **every** staff role's sidebar rather than just an admin's. Before it
+existed, every welcome message ended with "please change the password after your
+first sign-in" and there was nowhere in either app to do it.

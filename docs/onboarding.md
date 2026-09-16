@@ -91,16 +91,28 @@ nothing behind. If step 5 fails the firm is real and usable, so it is not rolled
 back; the error says so loudly and includes the password, because the alternative
 is losing a credential that has already been created.
 
-### The password is shown once, and nothing is emailed
+### The password is kept until they change it, and nothing is emailed
 
 `generatePassword()` uses `randomInt` from `node:crypto` and an alphabet with no
 `I`, `l`, `1`, `O` or `0` — these get read out on a call or typed off a WhatsApp
 message by someone who has never seen this app.
 
-It is **never stored**. Supabase keeps a hash; nothing in this repo writes the
-plaintext to a table, a log or a page that can be reloaded. Closing the panel
-loses it, and `resetPartnerPassword()` issues a new one. That is a deliberate
-trade against a column of plaintext passwords in a public repo's database.
+Since `006_credentials.sql` it is **sealed and kept** until its owner changes it,
+so an admin who closes the panel can find it again from the firm's page
+(**Their login**) or, for staff, by tapping the name on **Team**. It used to be
+thrown away, and the repair for a message that never got sent was to issue a new
+password over an account the firm might already have been given.
+
+`docs/auth.md` holds the full argument and the four states the lookup can return.
+The short version: encrypted with a key that never enters Postgres, unreachable
+by any signed-in session including an admin's own, erased the moment the password
+changes, and every lookup counted. Retention is **best-effort** — if it fails, or
+if `006` has not been pasted yet, the panel says the password was not retained
+and to copy it now, rather than promising something the database did not do.
+
+`resetPartnerPassword()` and `resetStaffPassword()` still exist for the case
+where there is nothing to read back. Reach for them second: issuing a new
+password invalidates whatever the firm was already sent.
 
 **Nothing is emailed from here, and that is a gap, not a design.** This
 deployment has no mail transport of its own. Pretending to send one would leave

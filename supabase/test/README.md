@@ -1,6 +1,6 @@
 # SQL tests
 
-Runs every file in `migrations/` (001–005), both files in `seed/`, and an RLS
+Runs every file in `migrations/` (001–006), both files in `seed/`, and an RLS
 isolation suite against a **throwaway Postgres 18** that lives in `./data`. Nothing here touches the real Supabase
 project, and its dependencies are deliberately kept out of the app's
 `package.json` so building the site never downloads Postgres binaries.
@@ -36,10 +36,28 @@ exists` and inflated row counts, not as a clear error.
 
 ## What `rlstest.js` asserts
 
-**169 checks, in twenty groups.** Groups 16–20 were added with `005_studio.sql`
+**189 checks, in twenty-two groups.** Groups 16–20 were added with `005_studio.sql`
 and cover escalations and their internal-note split, the referral decision guard
 and Appendix B's reason codes, the phone-reveal log, and notification
 preferences.
+
+**Groups 21–22 came with `006_credentials.sql`**, the migration that retains an
+issued password until its owner changes it, and they are its security argument
+in executable form:
+
+- **21** — an `admin`'s own signed-in session, a KAM's, a partner's and `anon`
+  all get `42501` on `issued_credential` and on all three of its functions. The
+  table is reachable only by the service role, from a server action that has
+  already checked `requireStaff(['admin'])`. An admin reading a password through
+  the console is not the same thing as an admin's *session* being able to read
+  the table.
+- **22** — the erase. The trigger on `auth.users` nulls the secret on any
+  password change, **and** the same erase is asserted with that trigger
+  disabled, because `app_read_credential()` re-checks the password fingerprint
+  on every read. Supabase does not always allow a trigger on `auth.users`, so
+  the guarantee must not rest on one. Also asserted: a login we never kept a
+  password for reads `none` and not `changed` — the distinction that stops an
+  admin resetting a perfectly good account.
 
 Two helpers, and the difference matters:
 

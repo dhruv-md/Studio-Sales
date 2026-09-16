@@ -579,6 +579,79 @@ async function asUser(c, uid, fn) {
   })
 
 
+  console.log('\n21. The retained password is unreadable by anyone signed in (006)')
+  // The whole security argument for keeping an issued password at all. The row
+  // is reachable ONLY by the service role, from a server action that has already
+  // checked requireStaff(['admin']) — never by an end user's session, admin or
+  // not, because an admin's session is still `authenticated` in Postgres.
+  const CRED_UID = '5ca1ab1e-0000-4000-8000-0000000000c1'
+  await c.query(`insert into auth.users (id, email, encrypted_password)
+                 values ($1,'kept@example.in','bcrypt-hash-as-issued')
+                 on conflict (id) do update set encrypted_password = 'bcrypt-hash-as-issued'`, [CRED_UID])
+  await c.query(`insert into issued_credential (user_id, kind, email, sealed, pw_fingerprint)
+                 values ($1,'staff','kept@example.in','v1.sealed.not.plaintext', md5('bcrypt-hash-as-issued'))
+                 on conflict (user_id) do update set sealed = excluded.sealed,
+                   pw_fingerprint = excluded.pw_fingerprint, changed_at = null`, [CRED_UID])
+
+  for (const [label, uid] of [['an admin', ADMIN_UID], ['a KAM', KAM_BLR_UID], ['a partner', DEMO_UID]]) {
+    await asUser(c, uid, async () => {
+      await blocked(`${label} cannot read one row of issued_credential`,
+        'select * from issued_credential', [], '42501')
+      await blocked(`${label} cannot call app_read_credential`,
+        'select app_read_credential($1)', [CRED_UID], '42501')
+      await blocked(`${label} cannot call app_pw_fingerprint`,
+        'select app_pw_fingerprint($1)', [CRED_UID], '42501')
+      await blocked(`${label} cannot erase the audit trail with app_forget_credential`,
+        'select app_forget_credential($1)', [CRED_UID], '42501')
+    })
+  }
+  await c.query('begin'); await c.query('set local role anon')
+  await blocked('anon cannot read it either', 'select * from issued_credential', [], '42501')
+  await c.query('rollback')
+
+  console.log('\n22. It is erased the moment its owner changes their password')
+  const state = async (uid) => (await c.query('select state from app_read_credential($1)', [uid])).rows[0].state
+  check('a freshly issued password reads as current', (await state(CRED_UID)) === 'current')
+
+  await c.query('begin')
+  // The trigger on auth.users. This is what makes "kept until they change it" a
+  // property of the database rather than a promise about our own code paths —
+  // it fires for a Supabase reset email and for the dashboard too, where none of
+  // this app's code runs.
+  await c.query(`update auth.users set encrypted_password = 'a-different-bcrypt-hash' where id = $1`, [CRED_UID])
+  check('changing the password erases the stored copy', await (async () => {
+    const { rows } = await c.query('select sealed, changed_at from issued_credential where user_id = $1', [CRED_UID])
+    return rows.length === 1 && rows[0].sealed === null && rows[0].changed_at !== null
+  })())
+  check('and it then reads as changed, not as nothing on file', (await state(CRED_UID)) === 'changed')
+  await c.query('rollback')
+
+  await c.query('begin')
+  // Belt and braces for the case the trigger could not be created — Supabase
+  // does not always let a project add one to auth.users. The read re-checks the
+  // fingerprint itself, so a password changed behind our back still cannot be
+  // shown to an admin as current.
+  await c.query(`alter table auth.users disable trigger forget_issued_credential`)
+  await c.query(`update auth.users set encrypted_password = 'changed-behind-our-back' where id = $1`, [CRED_UID])
+  check('a change the trigger missed is caught by the read', (await state(CRED_UID)) === 'changed')
+  check('and the secret is gone by the time it says so', await (async () => {
+    const { rows } = await c.query('select sealed from issued_credential where user_id = $1', [CRED_UID])
+    return rows[0].sealed === null
+  })())
+  await c.query(`alter table auth.users enable trigger forget_issued_credential`)
+  await c.query('rollback')
+
+  check('a login we never kept one for reads as none, not as changed',
+    (await state('5ca1ab1e-0000-4000-8000-00000000ffff')) === 'none')
+  check('and deleting the account takes the row with it', await (async () => {
+    await c.query('begin')
+    try {
+      await c.query('delete from auth.users where id = $1', [CRED_UID])
+      const { rows } = await c.query('select count(*)::int n from issued_credential where user_id = $1', [CRED_UID])
+      return rows[0].n === 0
+    } finally { await c.query('rollback') }
+  })())
+
   console.log(`\n${pass} passed, ${fail} failed`)
   await c.end()
   process.exit(fail ? 1 : 0)

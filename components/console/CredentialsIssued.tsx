@@ -6,14 +6,20 @@ import { Button } from '@/components/ui'
 import type { IssuedCredentials } from '@/lib/data/console-actions'
 
 /**
- * The one and only time this password is ever visible.
+ * A password, the moment it is issued.
  *
- * It is not stored anywhere — Supabase keeps a hash and nothing in this repo
- * writes the plaintext to a table, a log or a page that can be reloaded. Closing
- * this panel loses it for good, and a new one has to be issued. That is
- * deliberate; the alternative is a column of plaintext passwords.
+ * It used to be the only time it was ever visible. Since
+ * `006_credentials.sql` it is sealed and kept until its owner changes it, so an
+ * admin who loses this window can find it again by tapping the person's name —
+ * `CredentialPeek`. That is a deliberate trade and it is written on the panel,
+ * because an admin who believes a password is unrecoverable behaves differently
+ * from one who knows it is sitting there.
  *
- * There is also no email sent. This deployment has no mail transport, and
+ * `creds.notRetained` is the case where that failed — typically the migration
+ * not having been run. Then this really IS the only time, and the panel says so
+ * rather than repeating a promise the database did not keep.
+ *
+ * There is still no email sent. This deployment has no mail transport, and
  * pretending to send one would leave an admin thinking a designer had been
  * written to when nobody had. The admin copies this and sends it the way they
  * already talk to that firm.
@@ -32,7 +38,7 @@ export function CredentialsIssued({
     `Sign in at ${typeof window === 'undefined' ? '' : window.location.origin}/login\n` +
     `Email: ${creds.email}\n` +
     `Password: ${creds.password}\n\n` +
-    `Please change the password after your first sign-in.`
+    `Please change the password after your first sign-in — Settings → Sign-in.`
 
   async function copy(what: string, value: string) {
     try {
@@ -48,16 +54,28 @@ export function CredentialsIssued({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-[var(--radius-card)] border border-warn-soft bg-warn-soft px-3 py-2.5">
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-warn">
-          <KeyRound size={14} /> Shown once. Copy it now.
-        </p>
-        <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-          Nothing stores this password — if you close this without copying it, you will have to issue a
-          new one. Nothing is emailed from here either: send it to {creds.firmName} yourself, the way you
-          already talk to them.
-        </p>
-      </div>
+      {creds.notRetained ? (
+        <div className="rounded-[var(--radius-card)] border border-warn-soft bg-warn-soft px-3 py-2.5">
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-warn">
+            <KeyRound size={14} /> Shown once. Copy it now.
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+            The login works, but {creds.notRetained}. Close this without copying it and the only repair is to issue
+            another one.
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-[var(--radius-card)] border border-line bg-raised px-3 py-2.5">
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+            <KeyRound size={14} /> Kept until they change it
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+            If you lose this window you can find this password again by tapping their name — it stays readable until
+            they set their own, and is erased the moment they do. Nothing is emailed from here: send it to{' '}
+            {creds.firmName} yourself, the way you already talk to them.
+          </p>
+        </div>
+      )}
 
       <dl className="divide-y divide-line rounded-[var(--radius-card)] border border-line">
         <div className="flex items-center justify-between gap-3 px-3 py-2.5">

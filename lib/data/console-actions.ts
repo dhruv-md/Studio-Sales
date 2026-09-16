@@ -5,7 +5,7 @@ import { supabaseServer, supabaseService } from '@/lib/supabase/server'
 import { requireStaff } from './session'
 import { fail, ok, type Result } from './result'
 import { phone10 } from '@/lib/format'
-import { generatePassword } from '@/lib/auth/credentials'
+import { generatePassword, seal, unseal } from '@/lib/auth/credentials'
 import { recordUnlockedTiers } from './unlock'
 import type { OrderApproval, PartnerApplication, PortfolioStatus, ProspectStage, StaffRole, TouchKind } from '@/lib/domain/types'
 import type { OrderNotCounted } from '@/lib/domain/reasons'
@@ -424,7 +424,138 @@ export async function reviewApplication(id: string, status: 'approved' | 'reject
   return ok(data)
 }
 
-export type IssuedCredentials = { email: string; password: string; firmName: string }
+export type IssuedCredentials = {
+  email: string
+  password: string
+  firmName: string
+  /** Set when the password was issued but could NOT be retained — see
+   *  `rememberCredential`. The modal says so rather than promising the admin
+   *  they can come back for it later. */
+  notRetained?: string
+}
+
+/**
+ * What an admin gets back when they ask for somebody's login.
+ *
+ * Four states, not two, and the difference decides what the console says:
+ *
+ * - `current`    — we have the password we issued and they have not changed it.
+ * - `changed`    — they set their own. We had one and erased it, which is the
+ *                  system working as designed.
+ * - `none`       — we never kept one. Every login issued before
+ *                  `006_credentials.sql`, and any where retention failed.
+ * - `unreadable` — a row is there and will not open. A rotated service-role key,
+ *                  usually. NOT the same fact as "no password", and never shown
+ *                  as one.
+ */
+export type CredentialLookup =
+  | { state: 'current'; email: string; password: string; issuedAt: string; revealCount: number }
+  | { state: 'changed'; email: string | null; changedAt: string | null }
+  | { state: 'none' }
+  | { state: 'unreadable'; email: string | null; reason: string }
+
+type CredentialRow = {
+  state: 'current' | 'changed' | 'none'
+  sealed: string | null
+  email: string | null
+  kind: 'staff' | 'partner' | null
+  issued_at: string | null
+  changed_at: string | null
+  revealed_at: string | null
+  reveal_count: number | null
+}
+
+/**
+ * Keep the password we just issued, sealed, until its owner changes it.
+ *
+ * Best-effort ON PURPOSE, and loudly so. The login already exists and works by
+ * the time this runs, so failing the whole provisioning because the retention
+ * table is missing would be the worse outcome. A failure comes back as a
+ * sentence instead, and every caller puts that sentence in front of the admin —
+ * which is also exactly what an unapplied `006_credentials.sql` looks like from
+ * the outside. Silence here would leave an admin believing they could come back
+ * for a password that was never kept.
+ */
+async function rememberCredential(input: {
+  userId: string
+  kind: 'staff' | 'partner'
+  email: string
+  password: string
+  issuedBy: string
+}): Promise<string | null> {
+  const svc = supabaseService()
+  try {
+    const { data: fp, error: fpErr } = await svc.rpc('app_pw_fingerprint', { uid: input.userId })
+    if (fpErr) throw new Error(fpErr.message)
+
+    const { error } = await svc.from('issued_credential').upsert(
+      {
+        user_id: input.userId,
+        kind: input.kind,
+        email: input.email,
+        sealed: seal(input.password),
+        pw_fingerprint: fp,
+        issued_at: new Date().toISOString(),
+        issued_by: input.issuedBy,
+        changed_at: null,
+        revealed_at: null,
+        revealed_by: null,
+        reveal_count: 0,
+      },
+      { onConflict: 'user_id' },
+    )
+    if (error) throw new Error(error.message)
+    return null
+  } catch (e) {
+    return `the password was NOT retained (${e instanceof Error ? e.message : String(e)}), so copy it now — it cannot be looked up again`
+  }
+}
+
+/**
+ * The password we issued somebody, for an admin who has to send it again.
+ *
+ * Admin only, and the read is audited. `app_read_credential` re-checks the
+ * password fingerprint inside Postgres and erases the secret if it has moved
+ * on, so what comes back is either genuinely current or honestly labelled — the
+ * console can never show a password its owner has already replaced.
+ */
+export async function readIssuedCredential(userId: string): Promise<Result<CredentialLookup>> {
+  const staff = await requireStaff(['admin'])
+  if (!staff.ok) return staff
+
+  const svc = supabaseService()
+  const { data, error } = await svc.rpc('app_read_credential', { uid: userId })
+  if (error) {
+    return fail(
+      `Could not look up that login: ${error.message}. If that says the function is missing, 006_credentials.sql has not been run against this project yet — supabase/migrations/README.md.`,
+    )
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as CredentialRow | undefined
+  if (!row || row.state === 'none') return ok({ state: 'none' })
+  if (row.state === 'changed' || !row.sealed) {
+    return ok({ state: 'changed', email: row.email, changedAt: row.changed_at })
+  }
+
+  const opened = unseal(row.sealed)
+  if (!opened.ok) return ok({ state: 'unreadable', email: row.email, reason: opened.reason })
+
+  const { error: noteErr } = await svc.rpc('app_note_credential_reveal', {
+    uid: userId,
+    by_user: staff.data.user_id,
+  })
+  // The count is an audit trail, not a gate: a failure to write it must not
+  // withhold a password an admin needs. It is not swallowed either — the number
+  // shown simply does not advance, which is the honest reading of it.
+  const seen = (row.reveal_count ?? 0) + (noteErr ? 0 : 1)
+
+  return ok({
+    state: 'current',
+    email: row.email ?? '(unknown address)',
+    password: opened.value,
+    issuedAt: row.issued_at ?? '',
+    revealCount: seen,
+  })
+}
 
 /**
  * Create the firm and its login, from a form an admin has already verified.
@@ -534,6 +665,9 @@ export async function provisionFromApplication(id: string): Promise<Result<Issue
   // From here on a failure is cosmetic — the firm exists and can sign in — so
   // these are reported in the result rather than rolled back.
   const notes: string[] = []
+  const notRetained = await rememberCredential({
+    userId, kind: 'partner', email, password, issuedBy: staff.data.user_id,
+  })
   const { error: actErr } = await svc.from('partner_activity').insert([
     {
       partner_id: partner.id,
@@ -577,12 +711,16 @@ export async function provisionFromApplication(id: string): Promise<Result<Issue
     email,
     password,
     firmName: `${a.firm_name}${notes.length ? ` — note: ${notes.join('; ')}` : ''}`,
+    notRetained: notRetained ?? undefined,
   })
 }
 
 /**
- * A new one-time password for a firm that cannot get in. Admin only, and shown
- * once for the same reason as the first one.
+ * A new one-time password for a firm that cannot get in. Admin only.
+ *
+ * Reach for this only when the stored one is gone — since `006_credentials.sql`
+ * the password we issued can be read back from the firm's page, and issuing a
+ * new one INVALIDATES whatever the firm was already sent.
  */
 export async function resetPartnerPassword(partnerId: string): Promise<Result<IssuedCredentials>> {
   const staff = await requireStaff(['admin'])
@@ -604,11 +742,43 @@ export async function resetPartnerPassword(partnerId: string): Promise<Result<Is
   if (error) return fail(`Could not set a new password: ${error.message}`)
 
   const firm = link.partner as unknown as { firm_name: string; email: string | null } | null
+  const email = updated?.user?.email ?? firm?.email ?? '(unknown address)'
+  const notRetained = await rememberCredential({
+    userId: link.user_id as string, kind: 'partner', email, password, issuedBy: staff.data.user_id,
+  })
+
   return ok({
-    email: updated?.user?.email ?? firm?.email ?? '(unknown address)',
+    email,
     password,
     firmName: firm?.firm_name ?? 'this firm',
+    notRetained: notRetained ?? undefined,
   })
+}
+
+/**
+ * The same lookup, addressed by firm rather than by login.
+ *
+ * A firm's principal login is the oldest `partner_user` row — the one
+ * `provisionFromApplication` creates and the one `resetPartnerPassword` resets,
+ * so all three agree on which account they mean. A firm with no login at all is
+ * `none`, which reads correctly on the panel: nothing to send, issue one.
+ */
+export async function readPartnerCredential(partnerId: string): Promise<Result<CredentialLookup>> {
+  const staff = await requireStaff(['admin'])
+  if (!staff.ok) return staff
+
+  const svc = supabaseService()
+  const { data: link, error } = await svc
+    .from('partner_user')
+    .select('user_id')
+    .eq('partner_id', partnerId)
+    .order('created_at')
+    .limit(1)
+    .maybeSingle()
+  if (error) return fail(`Could not find the login for this firm: ${error.message}`)
+  if (!link) return ok({ state: 'none' })
+
+  return readIssuedCredential(link.user_id as string)
 }
 
 // ================================================================== staff
@@ -658,8 +828,55 @@ export async function createStaffMember(input: {
     return fail(`Could not add them to the team, so the login was removed again: ${error.message}`)
   }
 
+  const notRetained = await rememberCredential({
+    userId: created.user.id, kind: 'staff', email, password, issuedBy: staff.data.user_id,
+  })
+
   revalidatePath('/console/staff')
-  return ok({ email, password, firmName: input.name.trim() })
+  return ok({ email, password, firmName: input.name.trim(), notRetained: notRetained ?? undefined })
+}
+
+/**
+ * A new password for somebody on the team who cannot get in.
+ *
+ * The staff half of `resetPartnerPassword`, and it did not exist until now: the
+ * only repair for a KAM who lost their password was to delete them and add them
+ * again. Same admin gate, same retention, and the same warning — issuing a new
+ * one invalidates the one they may already have.
+ *
+ * Refused for yourself. Changing your own password from here would work, but
+ * Settings asks for the current one first, which is the check that stops a
+ * borrowed console session from locking you out of your own account.
+ */
+export async function resetStaffPassword(userId: string): Promise<Result<IssuedCredentials>> {
+  const staff = await requireStaff(['admin'])
+  if (!staff.ok) return staff
+  if (userId === staff.data.user_id) {
+    return fail('Change your own password from Settings — it asks for your current one first.')
+  }
+
+  const svc = supabaseService()
+  const { data: member, error: readErr } = await svc
+    .from('staff_user').select('name, email').eq('user_id', userId).maybeSingle()
+  if (readErr) return fail(`Could not find them on the team: ${readErr.message}`)
+  if (!member) return fail('That login is not on the B2B team.')
+
+  const password = generatePassword()
+  const { data: updated, error } = await svc.auth.admin.updateUserById(userId, { password })
+  if (error) return fail(`Could not set a new password: ${error.message}`)
+
+  const email = updated?.user?.email ?? (member.email as string | null) ?? '(unknown address)'
+  const notRetained = await rememberCredential({
+    userId, kind: 'staff', email, password, issuedBy: staff.data.user_id,
+  })
+
+  revalidatePath('/console/staff')
+  return ok({
+    email,
+    password,
+    firmName: (member.name as string) ?? 'them',
+    notRetained: notRetained ?? undefined,
+  })
 }
 
 export async function updateStaffMember(userId: string, values: { role?: StaffRole; market?: string | null; active?: boolean; phone?: string | null; name?: string }) {

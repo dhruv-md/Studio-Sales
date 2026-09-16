@@ -74,3 +74,36 @@ Six event classes × three channels. Two rules:
 Nothing sends notifications yet. `docs/open-questions.md` has the standing note
 about there being no mail or WhatsApp transport on this deployment; these
 preferences are the contract the sender will read.
+
+## Sign-in (not in §13)
+
+A fifth tab on the partner's Settings, and the whole of the console's.
+
+Every login on this platform starts as a password somebody else generated and
+sent over WhatsApp, and since `006_credentials.sql` the console **keeps** that
+password until it is changed. There was nowhere in either app to change it — the
+welcome message said "please change the password after your first sign-in" and
+pointed at nothing.
+
+`ChangePassword` (`components/account/ChangePassword.tsx`) is one component used
+by both apps, which is why it is not in `components/console/` — a folder
+`app/(app)/` is not allowed to import from. It asks for the current password
+first and verifies it against a throwaway Supabase client with no cookie
+storage: a check on the session alone would mean an unlocked laptop in a store
+is enough to lock somebody out of their own account.
+
+Changing the password is what ends retention, so this tab is the exit and
+`docs/auth.md` is the argument.
+
+### The console's Settings page
+
+`/console/settings`, on **every** staff role's sidebar and not just an admin's —
+for the reason above. It holds your own name and mobile (the mobile is what a
+partner sees on their KAM card), your password, and your role, market and email
+as read-only facts.
+
+Role and market are read-only on purpose rather than hidden. They decide whose
+firms and whose prospects you can see, so they are an admin's decision on the
+Team page; a self-service market box would be a self-service widening of your own
+access. Showing them answers "why can I not see the Hyderabad firms" without
+anybody having to ask.

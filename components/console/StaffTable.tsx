@@ -8,7 +8,11 @@ import {
 } from '@/components/ui'
 import { Modal } from '@/components/ui/Modal'
 import { CredentialsIssued } from './CredentialsIssued'
-import { createStaffMember, updateStaffMember, type IssuedCredentials } from '@/lib/data/console-actions'
+import { CredentialPeek } from './CredentialPeek'
+import {
+  createStaffMember, readIssuedCredential, resetStaffPassword, updateStaffMember,
+  type IssuedCredentials,
+} from '@/lib/data/console-actions'
 import { MARKETS, marketLabel } from '@/lib/domain/markets'
 import type { StaffRole, StaffUser } from '@/lib/domain/types'
 import { date } from '@/lib/format'
@@ -34,6 +38,7 @@ export function StaffTable({ team, meId, error }: { team: StaffUser[]; meId: str
   const [adding, setAdding] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const [creds, setCreds] = useState<IssuedCredentials | null>(null)
+  const [peek, setPeek] = useState<StaffUser | null>(null)
   const [pending, start] = useTransition()
 
   function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>, after?: () => void) {
@@ -87,7 +92,17 @@ export function StaffTable({ team, meId, error }: { team: StaffUser[]; meId: str
                 return (
                   <tr key={s.user_id} className={s.active ? '' : 'opacity-50'}>
                     <Td className="font-medium">
-                      {s.name}
+                      {/* The name is the way in to their login. There is no
+                          other row-level detail behind it, so a whole detail
+                          page would be a page with one card on it. */}
+                      <button
+                        type="button"
+                        onClick={() => setPeek(s)}
+                        className="text-left font-medium text-ink underline decoration-line-strong underline-offset-4 hover:decoration-brand"
+                        title={`See the login we issued ${s.name}`}
+                      >
+                        {s.name}
+                      </button>
                       {me ? <span className="ml-1.5 text-[11px] font-normal text-ink-faint">(you)</span> : null}
                     </Td>
                     <Td>
@@ -145,6 +160,10 @@ export function StaffTable({ team, meId, error }: { team: StaffUser[]; meId: str
               <li key={r}><strong className="text-ink-soft">{ROLE[r].label}</strong> — {ROLE[r].blurb}</li>
             ))}
           </ul>
+          <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+            Tap a name to see the login we issued them. It is readable until they change their own password, at which
+            point it is erased and cannot be recovered by anybody here.
+          </p>
         </div>
       </Card>
 
@@ -197,6 +216,36 @@ export function StaffTable({ team, meId, error }: { team: StaffUser[]; meId: str
         hint={creds ? `For ${creds.firmName}` : undefined}
       >
         {creds ? <CredentialsIssued creds={creds} onDone={() => setCreds(null)} /> : null}
+      </Modal>
+
+      <Modal
+        open={peek !== null}
+        onClose={() => setPeek(null)}
+        title={peek ? `${peek.name}’s login` : 'Login'}
+        hint={peek ? ROLE[peek.role].label + (peek.email ? ` · ${peek.email}` : '') : undefined}
+      >
+        {peek ? (
+          <CredentialPeek
+            load={() => readIssuedCredential(peek.user_id)}
+            who={peek.name}
+            resetting={pending}
+            onReset={
+              peek.user_id === meId
+                ? undefined
+                : () =>
+                    start(async () => {
+                      setProblem(null)
+                      const res = await resetStaffPassword(peek.user_id)
+                      // Close either way: the message belongs on the page, not
+                      // behind the modal that is still covering it.
+                      setPeek(null)
+                      if (!res.ok) return setProblem(res.error)
+                      setCreds(res.data)
+                      router.refresh()
+                    })
+            }
+          />
+        ) : null}
       </Modal>
     </>
   )
