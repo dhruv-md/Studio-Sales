@@ -84,7 +84,8 @@ exactly this reason.
 
 ## The screens
 
-`?tab=` on `/rewards`, four of them, per the §7 IA.
+`?tab=` on `/rewards`, five of them, per the §7 IA plus the client-facing
+revamp's comparison tab.
 
 - **This month / This quarter** — `SlabProgress`. Spend, slab, the whole ladder
   with every band marked, the gap in rupees *and what it buys*, days left, and
@@ -93,6 +94,11 @@ exactly this reason.
   to cut it to five and it is the wrong instinct: what makes a partner ring
   their KAM is not a big number or a small one, it is a number with no working
   shown.
+- **Compare** — `RewardCompare`. A calculator ("if you did this much business
+  with us, this is what it pays") plus both ladders laid out for direct
+  comparison. Driven through the same `positionIn()` / `cashbackFor()` the
+  real tabs use, on a typed hypothetical spend rather than the firm's actual
+  one — presentation only, nothing here writes anything.
 - **Programme terms** — versioned prose, `PROGRAMME_VERSION`.
 - **Coin wall** — `CoinWall`, on the month tab. Twelve squares, one per month.
   §10.5.3 asks for this instead of a lifetime badge, and the honesty is the

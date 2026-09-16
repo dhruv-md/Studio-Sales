@@ -1,14 +1,16 @@
 import Link from 'next/link'
-import { Info, UsersRound } from 'lucide-react'
+import { UsersRound } from 'lucide-react'
 import { currentSession, myKam } from '@/lib/data/session'
-import { listNotificationPrefs } from '@/lib/data/queries'
+import { listNotificationPrefs, listTeamInvites } from '@/lib/data/queries'
 import { ProfileForm } from '@/components/settings/ProfileForm'
 import { ThemePicker } from '@/components/settings/ThemePicker'
 import { NotificationPrefs } from '@/components/settings/NotificationPrefs'
+import { TeamInvites } from '@/components/settings/TeamInvites'
 import { ChangePassword } from '@/components/account/ChangePassword'
 import { KamCard } from '@/components/partner/KamCard'
 import { PageHead } from '@/components/shell/PageHead'
 import { Badge, Card, CardHead, Problem } from '@/components/ui'
+import type { PartnerTeamInvite } from '@/lib/domain/types'
 
 /**
  * About / Settings — PRD §13.
@@ -52,7 +54,9 @@ export default async function SettingsPage({
   const { tab } = await searchParams
   const active: TabKey = (TABS.find((t) => t.key === tab)?.key ?? 'profile') as TabKey
 
-  const [session, kam, prefs] = await Promise.all([currentSession(), myKam(), listNotificationPrefs()])
+  const [session, kam, prefs, invites] = await Promise.all([
+    currentSession(), myKam(), listNotificationPrefs(), listTeamInvites(),
+  ])
 
   if (!session.ok) {
     return (
@@ -84,7 +88,14 @@ export default async function SettingsPage({
               <Problem title="We could not load your notification settings" detail={prefs.error} />
             )
           ) : null}
-          {active === 'team' ? <Team partner={partner} email={email} /> : null}
+          {active === 'team' ? (
+            <Team
+              partner={partner}
+              email={email}
+              invites={invites.ok ? invites.data : []}
+              invitesError={invites.ok ? null : invites.error}
+            />
+          ) : null}
           {active === 'signin' ? (
             <ChangePassword hint="Your login was created by Material Depot and the password was generated for you. Changing it here is what stops anyone there being able to read it." />
           ) : null}
@@ -119,15 +130,22 @@ export default async function SettingsPage({
   )
 }
 
-function Team({ partner, email }: { partner: { firm_name: string; gst: string | null; phone: string }; email: string | null }) {
+function Team({
+  partner, email, invites, invitesError,
+}: {
+  partner: { firm_name: string; gst: string | null; phone: string }
+  email: string | null
+  invites: PartnerTeamInvite[]
+  invitesError?: string | null
+}) {
   return (
     <>
       <Card>
         <CardHead
           title="Who can get in"
-          hint="Three kinds of access: you, your design team, and whoever does procurement."
+          hint="You, plus anyone Material Depot has issued a login to on your behalf."
         />
-        <div className="px-4 py-4">
+        <div className="px-4 pt-4">
           <div className="flex items-start gap-3 rounded-lg border border-line bg-raised px-3 py-2.5">
             <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
               <UsersRound size={15} />
@@ -138,23 +156,19 @@ function Team({ partner, email }: { partner: { firm_name: string; gst: string | 
             </div>
             <Badge tone="good" className="ml-auto">Active</Badge>
           </div>
-
-          {/* §13.2. Not a form, because `partner_user` has no insert policy for
-              a firm and never will — the alternative is a login into a
-              supplier's system that the supplier did not issue. Saying who to
-              ask is more useful than a form that fails. */}
-          <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-ink-soft">
-            <Info size={13} className="mt-0.5 shrink-0 text-ink-faint" />
-            <span>
-              To add someone from your team, tell your key account manager their name, mobile and what they should be
-              able to see — <strong className="text-ink">Design team</strong> (projects and their own clients) or{' '}
-              <strong className="text-ink">Procurement</strong> (orders, GST and invoices, no rewards configuration).
-              We create the login and send it to you; they change the password the first time they sign in. We issue
-              logins rather than letting you create them because these are credentials into our systems, and the
-              paperwork for that sits with us.
-            </span>
-          </p>
         </div>
+
+        {/* §13.2 as a real request now, not just instructions: `partner_user`
+            still has no insert policy for a firm and never will — a self-serve
+            seat would be a login into Material Depot's systems the firm did
+            not ask us to issue — but a firm can file the request itself and
+            see where it has got to, instead of a phone call that leaves no
+            record. */}
+        {invitesError ? (
+          <div className="px-4 pb-4"><Problem title="Your team requests could not be loaded" detail={invitesError} /></div>
+        ) : (
+          <TeamInvites invites={invites} />
+        )}
       </Card>
 
       <Card>

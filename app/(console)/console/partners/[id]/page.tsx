@@ -4,6 +4,7 @@ import { Eye } from 'lucide-react'
 import { requireStaff } from '@/lib/data/session'
 import {
   getPartner, listActivityFor, listClaimsFor, listOrdersFor, listPortfolioFor, listReferralsFor, listStaff,
+  listTeamInvitesFor,
 } from '@/lib/data/console-queries'
 import { listRewardTiers } from '@/lib/data/queries'
 import { PartnerDetail } from '@/components/console/PartnerDetail'
@@ -35,9 +36,9 @@ export default async function ConsolePartnerPage({ params }: { params: Promise<{
   // staff member out of market is the same answer as "does not exist".
   if (!partner.data) notFound()
 
-  const [referrals, claims, tiers, activity, team, portfolio] = await Promise.all([
+  const [referrals, claims, tiers, activity, team, portfolio, teamInvites] = await Promise.all([
     listReferralsFor(id), listClaimsFor(id), listRewardTiers(), listActivityFor(id), listStaff(),
-    listPortfolioFor(id),
+    listPortfolioFor(id), listTeamInvitesFor(id),
   ])
 
   const orders = await listOrdersFor(referrals.ok ? referrals.data.map((r) => r.id) : [])
@@ -49,6 +50,7 @@ export default async function ConsolePartnerPage({ params }: { params: Promise<{
     !tiers.ok ? tiers.error : null,
     !activity.ok ? activity.error : null,
     !portfolio.ok ? portfolio.error : null,
+    !teamInvites.ok ? teamInvites.error : null,
   ].filter((v): v is string => Boolean(v))
 
   return (
@@ -73,6 +75,7 @@ export default async function ConsolePartnerPage({ params }: { params: Promise<{
           activity={activity.ok ? activity.data : []}
           portfolio={portfolio.ok ? portfolio.data : []}
           team={team.ok ? team.data : []}
+          teamInvites={teamInvites.ok ? teamInvites.data : []}
           isAdmin={staff.data.role === 'admin'}
           problems={problems}
         />

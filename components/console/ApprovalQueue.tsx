@@ -240,21 +240,39 @@ export function ApprovalQueue({
                         ) : '—'}
                         {p.city ? ` · ${p.city}` : ''}
                         {p.project_type ? ` · ${p.project_type}` : ''}
-                        {p.completed_on ? ` · finished ${date(p.completed_on)}` : ''}
+                        {p.rough_cost ? ` · ${inr(p.rough_cost)}` : ''}
                       </p>
                       {p.summary ? <p className="mt-1 text-sm text-ink-soft">{p.summary}</p> : null}
-                      {p.cover_url ? (
-                        <a
-                          href={p.cover_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-brand hover:underline"
-                        >
-                          <ExternalLink size={11} /> Open the cover image
-                        </a>
-                      ) : (
-                        <p className="mt-1 text-[11px] text-ink-faint">No cover image supplied.</p>
-                      )}
+                      {p.inspiration ? (
+                        <p className="mt-1 text-xs text-ink-faint"><strong className="text-ink-soft">Inspiration:</strong> {p.inspiration}</p>
+                      ) : null}
+                      {p.aspects_covered?.length ? (
+                        <p className="mt-1 text-[11px] text-ink-faint">Covers: {p.aspects_covered.join(', ')}</p>
+                      ) : null}
+                      <div className="mt-1 flex flex-wrap gap-x-3">
+                        {p.cover_url ? (
+                          <a
+                            href={p.cover_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-brand hover:underline"
+                          >
+                            <ExternalLink size={11} /> Cover image
+                          </a>
+                        ) : (
+                          <p className="text-[11px] text-ink-faint">No cover image supplied.</p>
+                        )}
+                        {p.drive_link ? (
+                          <a
+                            href={p.drive_link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-brand hover:underline"
+                          >
+                            <ExternalLink size={11} /> Drive folder
+                          </a>
+                        ) : null}
+                      </div>
                       {p.credits ? <p className="text-[11px] text-ink-faint">Credits: {p.credits}</p> : null}
                     </div>
                     <div className="flex shrink-0 gap-2">

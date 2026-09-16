@@ -10,8 +10,8 @@ import { Modal } from '@/components/ui/Modal'
 import {
   createPortfolioItem, deletePortfolioItem, submitPortfolioItem, updatePortfolioItem, updateStudioProfile,
 } from '@/lib/data/actions'
-import type { Partner, PortfolioItem, PortfolioStatus } from '@/lib/domain/types'
-import { date } from '@/lib/format'
+import { PORTFOLIO_ASPECTS, type Partner, type PortfolioItem, type PortfolioStatus } from '@/lib/domain/types'
+import { inr } from '@/lib/format'
 
 /**
  * What the four statuses mean to the firm, in their words rather than the
@@ -32,10 +32,20 @@ export function PortfolioView({ partner, items }: { partner: Partner; items: Por
   const [editing, setEditing] = useState<PortfolioItem | null>(null)
   const [adding, setAdding] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [aspects, setAspects] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
   const live = items.filter((i) => i.status === 'published').length
+
+  function openAdd() {
+    setAspects([])
+    setAdding(true)
+  }
+  function openEdit(item: PortfolioItem) {
+    setAspects(item.aspects_covered ?? [])
+    setEditing(item)
+  }
 
   function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>, done?: () => void) {
     setError(null)
@@ -53,10 +63,11 @@ export function PortfolioView({ partner, items }: { partner: Partner; items: Por
       summary: String(form.get('summary') ?? ''),
       project_type: String(form.get('project_type') ?? ''),
       city: String(form.get('city') ?? ''),
-      completed_on: String(form.get('completed_on') ?? '') || null,
-      area_sqft: form.get('area_sqft') ? Number(form.get('area_sqft')) : null,
       cover_url: String(form.get('cover_url') ?? ''),
-      credits: String(form.get('credits') ?? ''),
+      inspiration: String(form.get('inspiration') ?? ''),
+      drive_link: String(form.get('drive_link') ?? ''),
+      rough_cost: form.get('rough_cost') ? Number(form.get('rough_cost')) : null,
+      aspects_covered: aspects,
     }
     if (editing) {
       run(() => updatePortfolioItem(editing.id, input), () => setEditing(null))
@@ -102,14 +113,14 @@ export function PortfolioView({ partner, items }: { partner: Partner; items: Por
         <CardHead
           title="Projects"
           hint="Each one is reviewed before it goes on our site — usually within a couple of days."
-          action={<Button variant="primary" onClick={() => setAdding(true)}><Plus size={15} /> Add a project</Button>}
+          action={<Button variant="primary" onClick={openAdd}><Plus size={15} /> Add a project</Button>}
         />
 
         {items.length === 0 ? (
           <Empty
             title="Nothing here yet"
             body="Add a finished project — a name, a couple of lines and a cover image is plenty. We put it on our partners page with a link back to you."
-            action={<Button variant="primary" onClick={() => setAdding(true)}><Plus size={15} /> Add your first project</Button>}
+            action={<Button variant="primary" onClick={openAdd}><Plus size={15} /> Add your first project</Button>}
           />
         ) : (
           <ul className="divide-y divide-line">
@@ -134,8 +145,8 @@ export function PortfolioView({ partner, items }: { partner: Partner; items: Por
                       {[
                         item.project_type,
                         item.city,
-                        item.completed_on ? `finished ${date(item.completed_on)}` : null,
-                        item.area_sqft ? `${item.area_sqft} sqft` : null,
+                        item.rough_cost ? inr(item.rough_cost) : null,
+                        item.aspects_covered?.length ? item.aspects_covered.join(', ') : null,
                       ].filter(Boolean).join(' · ') || s.blurb}
                     </p>
                     {item.status === 'rejected' && item.review_note ? (
@@ -148,7 +159,7 @@ export function PortfolioView({ partner, items }: { partner: Partner; items: Por
                   <div className="flex shrink-0 gap-1.5">
                     {editable ? (
                       <>
-                        <Button size="sm" onClick={() => setEditing(item)} disabled={pending}>
+                        <Button size="sm" onClick={() => openEdit(item)} disabled={pending}>
                           <Pencil size={13} /> Edit
                         </Button>
                         <Button
@@ -190,8 +201,11 @@ export function PortfolioView({ partner, items }: { partner: Partner; items: Por
           <Field label="Project name" required>
             <Input name="title" defaultValue={editing?.title ?? ''} placeholder="Terrazzo House, Koramangala" />
           </Field>
-          <Field label="A couple of lines about it" hint="This is the caption under your photographs.">
+          <Field label="Project details" hint="This is the caption under your photographs.">
             <Textarea name="summary" rows={3} defaultValue={editing?.summary ?? ''} />
+          </Field>
+          <Field label="Inspiration behind it">
+            <Textarea name="inspiration" rows={2} defaultValue={editing?.inspiration ?? ''} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Type">
@@ -205,22 +219,40 @@ export function PortfolioView({ partner, items }: { partner: Partner; items: Por
               <Input name="city" defaultValue={editing?.city ?? ''} />
             </Field>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Finished on">
-              <Input type="date" name="completed_on" defaultValue={editing?.completed_on ?? ''} />
-            </Field>
-            <Field label="Area (sqft)">
-              <Input type="number" name="area_sqft" defaultValue={editing?.area_sqft ?? ''} inputMode="numeric" />
-            </Field>
-          </div>
+          <Field
+            label="Google Drive link for images"
+            hint="A folder with your photographs — this is what a viewer opens for the full set."
+          >
+            <Input name="drive_link" defaultValue={editing?.drive_link ?? ''} placeholder="https://drive.google.com/…" />
+          </Field>
           <Field
             label="Cover image"
-            hint="A link to a photograph. Uploading from here is not built yet — paste a URL from wherever your photographs already live."
+            hint="A link to a single photograph. Uploading from here is not built yet — paste a URL from wherever your photographs already live."
           >
             <Input name="cover_url" defaultValue={editing?.cover_url ?? ''} placeholder="https://…" />
           </Field>
-          <Field label="Credits" hint="Photographer, collaborators — whoever should be named.">
-            <Input name="credits" defaultValue={editing?.credits ?? ''} />
+          <Field label="Rough cost" hint="Optional. What the project came to, roughly.">
+            <Input type="number" name="rough_cost" defaultValue={editing?.rough_cost ?? ''} inputMode="numeric" />
+          </Field>
+          <Field label="Aspects covered" hint="Tick anything that applies.">
+            <div className="flex flex-wrap gap-1.5">
+              {PORTFOLIO_ASPECTS.map((a) => {
+                const on = aspects.includes(a)
+                return (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => setAspects((prev) => (on ? prev.filter((x) => x !== a) : [...prev, a]))}
+                    className={[
+                      'rounded-full border px-2.5 py-1 text-xs font-medium transition',
+                      on ? 'border-brand bg-brand-soft text-brand' : 'border-line bg-surface text-ink-soft hover:border-line-strong',
+                    ].join(' ')}
+                  >
+                    {a}
+                  </button>
+                )
+              })}
+            </div>
           </Field>
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="ghost" onClick={() => { setAdding(false); setEditing(null) }}>

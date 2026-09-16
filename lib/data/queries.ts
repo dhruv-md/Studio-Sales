@@ -4,6 +4,7 @@ import type {
   Board, BoardItem, Client, FinanceEntry, ProcurementItem, Project, ProjectArea,
   Quote, QuoteLine, Referral, ReferralEvent, ReferralOrder, ReferralPhone, RewardClaim, RewardTier,
   PortfolioItem, PartnerActivity, Escalation, EscalationComment, NotificationPref, VisitRequest,
+  PartnerTeamInvite,
 } from '@/lib/domain/types'
 
 /**
@@ -145,6 +146,12 @@ export const listVisitRequests = (referralIds: string[]) =>
         'the visits you have scheduled',
       )
     : Promise.resolve(ok<VisitRequest[]>([]))
+
+export const listTeamInvites = () =>
+  many<PartnerTeamInvite>(
+    (sb) => sb.from('partner_team_invite').select('*').order('requested_at', { ascending: false }),
+    'the team requests you have sent',
+  )
 
 // ----------------------------------------------------------------- rewards
 

@@ -11,8 +11,20 @@ shortcoming.
 
 **Team** (§13.2). `partner_user` has no insert policy for a firm and should not
 get one: a self-serve seat would be a login into Material Depot's systems that
-Material Depot did not issue. So the tab explains what to ask for and who to ask
-— which is more useful than a form that fails.
+Material Depot did not issue. Since the client-facing revamp this is a real
+request instead of just instructions — `partner_team_invite`
+(007_studio_v2.sql), `TeamInvites` component, `requestTeamInvite()` in
+`lib/data/actions.ts`. A firm names someone and what they should see (Design
+team or Procurement) and sees the request's status; an admin approves or
+rejects it from that firm's page in the console (`TeamRequests` in
+`PartnerDetail.tsx`). Approving is `provisionTeamInvite()`
+(`console-actions.ts`) — the exact generate-password / create-user /
+seal-and-retain sequence `provisionFromApplication()` uses for a whole new
+firm, here attaching a second `partner_user` row to the firm that already
+exists. No table has an update policy for anybody, including staff: creating
+a login or telling someone their request was declined goes through the
+service role only, the same way approving an order or publishing a portfolio
+piece does.
 
 **GSTIN** (§13.1). Orders billed to a linked GST roll up into the parent for slab
 computation, so a firm adding one would be adding to its own reward base. The

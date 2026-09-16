@@ -808,6 +808,32 @@ export async function deleteReferral(id: string) {
   return remove('referral', id, 'this referral', '/referrals')
 }
 
+// ------------------------------------------------------------- team invites
+
+/**
+ * §13.2 — a firm cannot create its own login (`partner_user` has no insert
+ * policy, on purpose: a self-serve seat would be a login into Material
+ * Depot's systems the firm did not ask us to issue). This is the request half
+ * of that: name, email, and what they should be able to see. An admin
+ * approves or rejects it in the console; approving is `provisionTeamInvite()`
+ * in `console-actions.ts`, which creates the login the same way onboarding a
+ * whole firm does.
+ */
+export async function requestTeamInvite(input: { name: string; email: string; role: 'design_team' | 'procurement' }) {
+  const pid = await partnerId()
+  if (!pid.ok) return pid
+  if (!input.name?.trim()) return fail('Their name is needed.')
+  const email = input.email?.trim().toLowerCase()
+  if (!email || !email.includes('@')) return fail('A real email address is needed — it becomes their login.')
+
+  return insert('partner_team_invite', {
+    partner_id: pid.data,
+    name: input.name.trim(),
+    email,
+    role: input.role,
+  }, 'this request', '/settings')
+}
+
 // --------------------------------------------------------------- portfolio
 
 /**
@@ -824,10 +850,11 @@ export async function createPortfolioItem(input: {
   summary?: string | null
   project_type?: string | null
   city?: string | null
-  completed_on?: string | null
-  area_sqft?: number | null
   cover_url?: string | null
-  credits?: string | null
+  inspiration?: string | null
+  drive_link?: string | null
+  rough_cost?: number | null
+  aspects_covered?: string[]
 }) {
   if (!input.title?.trim()) return fail('Give the project a name — that is what appears on the site.')
   const pid = await partnerId()
@@ -841,10 +868,11 @@ export async function createPortfolioItem(input: {
       summary: input.summary?.trim() || null,
       project_type: input.project_type?.trim() || null,
       city: input.city?.trim() || null,
-      completed_on: input.completed_on || null,
-      area_sqft: input.area_sqft ?? null,
       cover_url: input.cover_url?.trim() || null,
-      credits: input.credits?.trim() || null,
+      inspiration: input.inspiration?.trim() || null,
+      drive_link: input.drive_link?.trim() || null,
+      rough_cost: input.rough_cost ?? null,
+      aspects_covered: input.aspects_covered?.length ? input.aspects_covered : [],
       status: 'draft',
     },
     'this portfolio piece',

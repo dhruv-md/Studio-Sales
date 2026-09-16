@@ -5,6 +5,16 @@
 Material Depot puts its partners' work on its own site. A partner adds projects
 here; an admin reads them and publishes.
 
+## The field list — client-facing revamp
+
+The submission form was rewritten: project name, project details, inspiration
+behind it, a Google Drive link for the full image set, a cover image (still a
+pasted URL), rough cost, and an aspects-covered checklist (`PORTFOLIO_ASPECTS`
+in `lib/domain/types.ts` — Design, Execution, Turnkey, Furniture, Lighting,
+Styling, easy to extend). `completed_on`, `area_sqft` and `credits` are
+dropped from the form on instruction; the columns stay in the schema
+untouched, so an already-submitted piece keeps whatever it had.
+
 ## The review gate is in the policy, not the UI
 
 ```

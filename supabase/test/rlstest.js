@@ -730,6 +730,45 @@ async function asUser(c, uid, fn) {
   await c.query('delete from visit_request where id = $1', [visitId])
   await c.query('commit')
 
+  console.log('\n25. Team invites (007) — a firm requests, only an admin decides')
+  // The insert has to actually COMMIT — `asUser()` rolls back at the end of
+  // every call, which is fine for a self-contained check but would erase this
+  // row before the later `asUser()` blocks for other logins could see it.
+  let inviteId
+  await c.query('begin')
+  await c.query(`set local role authenticated`)
+  await c.query(`select set_config('request.jwt.claim.sub', $1, true)`, [DEMO_UID])
+  const ins = await c.query(
+    `insert into partner_team_invite (partner_id, name, email, role)
+     values ('0d0d0d0d-0000-4000-8000-000000000001','Asha Rao','asha@example.in','design_team') returning id`)
+  inviteId = ins.rows[0].id
+  check('the demo firm can file a request', ins.rowCount === 1)
+  await c.query('commit')
+
+  await asUser(c, DEMO_UID, async () => {
+    await unchanged('but cannot approve its own request',
+      `update partner_team_invite set status = 'approved' where id = $1`, [inviteId])
+  })
+
+  await asUser(c, OTHER_UID, async () => {
+    check('another firm reads none of it',
+      (await count('select count(*)::int n from partner_team_invite where id = $1', [inviteId])) === 0)
+    await unchanged('and cannot file one for somebody else’s firm',
+      `insert into partner_team_invite (partner_id, name, email, role)
+       values ('0d0d0d0d-0000-4000-8000-000000000001','Someone Else','x@example.in','design_team')`)
+  })
+
+  await asUser(c, KAM_BLR_UID, async () => {
+    check('their KAM can see the request', (await count(
+      'select count(*)::int n from partner_team_invite where id = $1', [inviteId])) === 1)
+    await unchanged('but cannot approve it either — no update policy for staff at all',
+      `update partner_team_invite set status = 'approved' where id = $1`, [inviteId])
+  })
+
+  await c.query('begin')
+  await c.query('delete from partner_team_invite where id = $1', [inviteId])
+  await c.query('commit')
+
   console.log(`\n${pass} passed, ${fail} failed`)
   await c.end()
   process.exit(fail ? 1 : 0)

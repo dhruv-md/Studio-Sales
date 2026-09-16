@@ -1,7 +1,7 @@
 import { supabaseServer } from '@/lib/supabase/server'
 import { fail, ok, type Result } from './result'
 import type {
-  OutreachProspect, OutreachTouch, Partner, PartnerActivity, PartnerApplication,
+  OutreachProspect, OutreachTouch, Partner, PartnerActivity, PartnerApplication, PartnerTeamInvite,
   PortfolioItem, Referral, ReferralEvent, ReferralOrder, RewardClaim, StaffUser,
 } from '@/lib/domain/types'
 
@@ -57,6 +57,12 @@ export const listReferralsFor = (partnerId: string) =>
   many<Referral>(
     (sb) => sb.from('referral').select('*').eq('partner_id', partnerId).order('referred_on', { ascending: false }),
     'this firm’s referrals',
+  )
+
+export const listTeamInvitesFor = (partnerId: string) =>
+  many<PartnerTeamInvite>(
+    (sb) => sb.from('partner_team_invite').select('*').eq('partner_id', partnerId).order('requested_at', { ascending: false }),
+    'this firm’s team requests',
   )
 
 /**

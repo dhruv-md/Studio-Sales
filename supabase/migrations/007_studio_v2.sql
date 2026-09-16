@@ -220,3 +220,62 @@ create policy visit_request_staff_update on visit_request for update to authenti
   with check (
     exists (select 1 from referral r where r.id = referral_id and app_staff_sees_partner(r.partner_id))
   );
+
+-- ==================================== D. Portfolio — the new field list
+
+-- The submission form drops `completed_on`, `area_sqft` and `credits` in
+-- favour of the fields the client-facing revamp actually asks a partner for.
+-- The old columns are left in place (unused by this form, harmless) rather
+-- than dropped — a partner's already-submitted rows keep whatever they had.
+alter table portfolio_item add column if not exists inspiration      text;
+alter table portfolio_item add column if not exists drive_link       text;
+alter table portfolio_item add column if not exists rough_cost       numeric(14,2);
+alter table portfolio_item add column if not exists aspects_covered  text[] not null default '{}';
+
+-- ======================================== E. Settings → Team, as a request
+
+-- A firm asks for a teammate's login; an admin approves or rejects. Provi-
+-- sioning reuses the exact primitives `provisionFromApplication()` already
+-- uses (generatePassword, auth.admin.createUser, rememberCredential) — this
+-- is the same mechanism, scoped to an EXISTING partner_id instead of a new
+-- firm. Only an admin (service role) ever moves `status` or sets
+-- `provisioned_user_id`; RLS gives a firm no update policy on this table at
+-- all, so there is nothing here for a `partner_guard`-style trigger to guard.
+create table if not exists partner_team_invite (
+  id                  uuid primary key default gen_random_uuid(),
+  partner_id          uuid not null references partner(id) on delete cascade,
+  name                text not null,
+  email               text not null,
+  role                text not null check (role in ('design_team','procurement')),
+  status              text not null default 'requested'
+                        check (status in ('requested','approved','rejected')),
+  requested_by        uuid references auth.users(id) on delete set null,
+  requested_at        timestamptz not null default now(),
+  reviewed_by         uuid references auth.users(id) on delete set null,
+  reviewed_at         timestamptz,
+  review_note         text,
+  provisioned_user_id uuid references auth.users(id) on delete set null
+);
+
+create index if not exists partner_team_invite_partner_idx on partner_team_invite(partner_id);
+
+alter table partner_team_invite enable row level security;
+
+drop policy if exists partner_team_invite_read on partner_team_invite;
+create policy partner_team_invite_read on partner_team_invite for select to authenticated
+  using (partner_id in (select app_partner_ids()) or app_staff_sees_partner(partner_id));
+
+drop policy if exists partner_team_invite_insert on partner_team_invite;
+create policy partner_team_invite_insert on partner_team_invite for insert to authenticated
+  with check (partner_id in (select app_partner_ids()) and status = 'requested');
+
+-- No update policy for anybody, deliberately — including staff. Approving or
+-- rejecting an invite creates a real login (or tells someone their request
+-- was declined), so it goes through the service role from console-actions.ts
+-- only, the same way `provisionFromApplication()` does, never through a row
+-- a KAM's own session could patch directly.
+
+-- What an invited teammate is for, alongside `partner_user.role`'s access
+-- level (`associate`) — display only, so the console's own team list can say
+-- "Design team" or "Procurement" rather than just "Associate".
+alter table partner_user add column if not exists title text;

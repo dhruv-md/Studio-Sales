@@ -901,3 +901,93 @@ export async function updateStaffMember(userId: string, values: { role?: StaffRo
   revalidatePath('/console/staff')
   return ok(data)
 }
+
+const TEAM_INVITE_TITLE: Record<'design_team' | 'procurement', string> = {
+  design_team: 'Design team',
+  procurement: 'Procurement',
+}
+
+/**
+ * Approve a firm's request for a teammate's login. Same shape as
+ * `provisionFromApplication()` — generate a password, create the auth user,
+ * seal and retain the password — except this attaches a SECOND `partner_user`
+ * row to a firm that already exists, rather than creating a new firm. Schema
+ * already allows several `partner_user` rows per firm; nothing here changes
+ * that, it is just the first thing that actually creates one.
+ */
+export async function provisionTeamInvite(id: string): Promise<Result<IssuedCredentials>> {
+  const staff = await requireStaff(['admin'])
+  if (!staff.ok) return staff
+
+  const svc = supabaseService()
+  const { data: invite, error: readErr } = await svc
+    .from('partner_team_invite').select('*, partner:partner_id(id, firm_name)').eq('id', id).maybeSingle()
+  if (readErr) return fail(`Could not read the request: ${readErr.message}`)
+  if (!invite) return fail('That request no longer exists.')
+  if (invite.status !== 'requested') return fail(`This request is already ${invite.status}.`)
+
+  const email = String(invite.email).trim().toLowerCase()
+  const password = generatePassword()
+  const { data: created, error: authErr } = await svc.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { name: invite.name },
+  })
+  if (authErr || !created?.user) {
+    return fail(`Could not create the login for ${email}: ${authErr?.message ?? 'no user came back'}`)
+  }
+  const userId = created.user.id
+
+  const { error: linkErr } = await svc.from('partner_user').insert({
+    user_id: userId,
+    partner_id: invite.partner_id,
+    role: 'associate',
+    title: TEAM_INVITE_TITLE[invite.role as 'design_team' | 'procurement'],
+  })
+  if (linkErr) {
+    await svc.auth.admin.deleteUser(userId)
+    return fail(`Could not attach the login to the firm, so it was removed again: ${linkErr.message}`)
+  }
+
+  const notRetained = await rememberCredential({
+    userId, kind: 'partner', email, password, issuedBy: staff.data.user_id,
+  })
+
+  const { error: updErr } = await svc.from('partner_team_invite').update({
+    status: 'approved',
+    reviewed_by: staff.data.user_id,
+    reviewed_at: new Date().toISOString(),
+    provisioned_user_id: userId,
+  }).eq('id', id)
+  const notes = updErr ? [`the request could not be marked approved (${updErr.message})`] : []
+
+  revalidatePath('/settings')
+  revalidatePath(`/console/partners/${invite.partner_id}`)
+
+  return ok({
+    email,
+    password,
+    firmName: `${invite.name}${notes.length ? ` — note: ${notes.join('; ')}` : ''}`,
+    notRetained: notRetained ?? undefined,
+  })
+}
+
+export async function rejectTeamInvite(id: string, note: string) {
+  const staff = await requireStaff(['admin'])
+  if (!staff.ok) return staff
+  if (!note?.trim()) return fail('Say why, so the firm knows what to do next.')
+
+  const svc = supabaseService()
+  const { data, error } = await svc
+    .from('partner_team_invite')
+    .update({ status: 'rejected', reviewed_by: staff.data.user_id, reviewed_at: new Date().toISOString(), review_note: note.trim() })
+    .eq('id', id)
+    .eq('status', 'requested')
+    .select()
+    .single()
+  if (error) return fail(`Could not decline this request: ${error.message}`)
+  revalidatePath('/settings')
+  revalidatePath(`/console/partners/${data.partner_id}`)
+  return ok(data)
+}

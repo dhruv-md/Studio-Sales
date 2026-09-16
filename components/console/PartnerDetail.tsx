@@ -12,13 +12,14 @@ import { CredentialsIssued } from './CredentialsIssued'
 import { CredentialPeek } from './CredentialPeek'
 import { OrderApprovalBadge } from '@/components/referrals/OrderApproval'
 import {
-  logActivity, readPartnerCredential, resetPartnerPassword, updatePartnerAdminFields,
-  type IssuedCredentials,
+  logActivity, provisionTeamInvite, readPartnerCredential, rejectTeamInvite, resetPartnerPassword,
+  updatePartnerAdminFields, type IssuedCredentials,
 } from '@/lib/data/console-actions'
 import type { PartnerStanding } from '@/lib/domain/tiering'
 import { DORMANT_AFTER_DAYS } from '@/lib/domain/tiering'
 import type {
-  Partner, PartnerActivity, PortfolioItem, Referral, ReferralOrder, RewardClaim, RewardTier, StaffUser,
+  Partner, PartnerActivity, PartnerTeamInvite, PortfolioItem, Referral, ReferralOrder, RewardClaim, RewardTier,
+  StaffUser,
 } from '@/lib/domain/types'
 import { MARKETS, marketLabel } from '@/lib/domain/markets'
 import { date, dateTime, inr, inrShort } from '@/lib/format'
@@ -42,6 +43,7 @@ export function PartnerDetail({
   activity,
   portfolio,
   team,
+  teamInvites,
   isAdmin,
   problems,
 }: {
@@ -54,6 +56,7 @@ export function PartnerDetail({
   activity: PartnerActivity[]
   portfolio: PortfolioItem[]
   team: StaffUser[]
+  teamInvites: PartnerTeamInvite[]
   isAdmin: boolean
   problems: string[]
 }) {
@@ -233,6 +236,8 @@ export function PartnerDetail({
               </ul>
             )}
           </Card>
+
+          {isAdmin ? <TeamRequests invites={teamInvites} onError={setError} /> : null}
         </div>
 
         <div className="space-y-5">
@@ -412,5 +417,100 @@ export function PartnerDetail({
         ) : null}
       </Modal>
     </>
+  )
+}
+
+const TEAM_INVITE_ROLE_LABEL: Record<PartnerTeamInvite['role'], string> = {
+  design_team: 'Design team',
+  procurement: 'Procurement',
+}
+
+/**
+ * Approve creates a real login — `provisionTeamInvite()` does the same
+ * generate-password / create-user / seal-and-retain dance `Firms → Issue
+ * login` does, just against this firm's existing `partner_id` instead of a
+ * new one. Reject needs a reason, same as declining a referral: a firm should
+ * never read "declined" with nothing to act on.
+ */
+function TeamRequests({ invites, onError }: { invites: PartnerTeamInvite[]; onError: (e: string | null) => void }) {
+  const router = useRouter()
+  const [pending, start] = useTransition()
+  const [creds, setCreds] = useState<IssuedCredentials | null>(null)
+  const [rejecting, setRejecting] = useState<PartnerTeamInvite | null>(null)
+  const [note, setNote] = useState('')
+
+  const open = invites.filter((i) => i.status === 'requested')
+  const decided = invites.filter((i) => i.status !== 'requested')
+
+  function approve(id: string) {
+    onError(null)
+    start(async () => {
+      const res = await provisionTeamInvite(id)
+      if (!res.ok) return onError(res.error)
+      setCreds(res.data)
+      router.refresh()
+    })
+  }
+
+  function reject() {
+    if (!rejecting) return
+    onError(null)
+    start(async () => {
+      const res = await rejectTeamInvite(rejecting.id, note)
+      if (!res.ok) return onError(res.error)
+      setRejecting(null)
+      setNote('')
+      router.refresh()
+    })
+  }
+
+  if (!invites.length) return null
+
+  return (
+    <Card>
+      <CardHead title="Team requests" hint="A teammate this firm has asked us to provision a login for" />
+      {open.length === 0 ? (
+        <Empty title="Nothing waiting" body="No open requests from this firm." />
+      ) : (
+        <ul className="divide-y divide-line">
+          {open.map((inv) => (
+            <li key={inv.id} className="flex items-center gap-2 px-4 py-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm text-ink">{inv.name} <span className="text-ink-faint">· {inv.email}</span></p>
+                <p className="text-[11px] text-ink-faint">{TEAM_INVITE_ROLE_LABEL[inv.role]} · asked {date(inv.requested_at)}</p>
+              </div>
+              <Button size="sm" variant="primary" disabled={pending} onClick={() => approve(inv.id)}>Approve</Button>
+              <Button size="sm" variant="ghost" disabled={pending} onClick={() => setRejecting(inv)}>Decline</Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {decided.length ? (
+        <ul className="divide-y divide-line border-t border-line">
+          {decided.map((inv) => (
+            <li key={inv.id} className="flex items-center gap-2 px-4 py-2 text-xs text-ink-faint">
+              <span className="flex-1 truncate">{inv.name} · {TEAM_INVITE_ROLE_LABEL[inv.role]}</span>
+              <Badge tone={inv.status === 'approved' ? 'good' : 'bad'}>{inv.status}</Badge>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <Modal open={creds !== null} onClose={() => setCreds(null)} title="Login created" hint={creds ? `For ${creds.firmName}` : undefined}>
+        {creds ? <CredentialsIssued creds={creds} onDone={() => setCreds(null)} /> : null}
+      </Modal>
+
+      <Modal open={rejecting !== null} onClose={() => setRejecting(null)} title="Decline this request">
+        <div className="space-y-3">
+          <Field label="Why" required hint="The firm sees this note.">
+            <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setRejecting(null)}>Cancel</Button>
+            <Button variant="danger" disabled={pending || !note.trim()} onClick={reject}>Decline</Button>
+          </div>
+        </div>
+      </Modal>
+    </Card>
   )
 }

@@ -499,6 +499,37 @@ export type PortfolioItem = {
   sort_order: number
   created_at: string
   updated_at: string
+  // 007_studio_v2.sql — the client-facing revamp's field list. `completed_on`,
+  // `area_sqft` and `credits` above stay in the schema for old rows; the form
+  // no longer collects them.
+  inspiration?: string | null
+  drive_link?: string | null
+  rough_cost?: number | null
+  aspects_covered?: string[]
+}
+
+/** A short, editable checklist for "what all aspects were covered" on a
+ *  portfolio piece. Not a CHECK constraint — a firm's own work can legitimately
+ *  cover something this list has not thought of. */
+export const PORTFOLIO_ASPECTS = ['Design', 'Execution', 'Turnkey', 'Furniture', 'Lighting', 'Styling'] as const
+
+/** 007_studio_v2.sql — a firm asking Material Depot to provision a teammate. */
+export type TeamInviteRole = 'design_team' | 'procurement'
+export type TeamInviteStatus = 'requested' | 'approved' | 'rejected'
+
+export type PartnerTeamInvite = {
+  id: string
+  partner_id: string
+  name: string
+  email: string
+  role: TeamInviteRole
+  status: TeamInviteStatus
+  requested_by: string | null
+  requested_at: string
+  reviewed_by: string | null
+  reviewed_at: string | null
+  review_note: string | null
+  provisioned_user_id: string | null
 }
 
 // -------------------------------------------------------------- escalations
