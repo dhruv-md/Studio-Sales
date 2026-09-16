@@ -103,9 +103,9 @@ one address for you.
 | `app/api/sync/referrals` | Push endpoint for referral events and orders. Service-role, shared-secret. |
 | `lib/domain/**` | The rules, and no I/O. Money, quantity, areas, markets, the internal tiering and the per-client rollup — plus the incentive programme: `slabs.ts` (the §10 ladders), `ledger.ts` (attribution, maturation, the statement), `periods.ts` (calendar months in string space), `programme.ts` (**every §17 default, in one file**), `privacy.ts` (§14.5), `reasons.ts` (Appendix B), `theme.ts` (§13.3 + the AA gate). |
 | `lib/analytics/**` | §14.6's single instrumentation layer. **The only place in the app allowed to know a vendor exists** — `docs/analytics.md`. |
-| `lib/data/**` | Partner reads/writes (`queries.ts`, `actions.ts`), console reads/writes (`console-*.ts`), the `Result` type, the session and the role gates. |
+| `lib/data/**` | Partner reads/writes (`queries.ts`, `actions.ts`), console reads/writes (`console-*.ts`), **your own account (`account-actions.ts`, either app)**, the `Result` type, the session and the role gates. |
 | `lib/auth/credentials.ts` | The one-time password generator, and the AES-GCM seal that keeps it until its owner changes it — `docs/auth.md`. |
-| `components/**` | `ui/` primitives, then one folder per module. `console/` is staff-only and must never be imported from `app/(app)/`. |
+| `components/**` | `ui/` primitives, then one folder per module. `console/` is staff-only and must never be imported from `app/(app)/` — `account/` exists because of that rule, holding the one component both apps need. |
 | `app/(app)/settings` | §13 — studio profile, team, theme, notifications, and the Sign-in tab that changes a password. |
 | `app/(console)/console/settings` | A staff member's own account and password. On **every** console role's sidebar, because it is the only way to stop the console being able to read the password you were issued. |
 | `test/domain.test.ts` | The pure rules, asserted at their boundaries — including every published figure of the §10 slab tables. `npm run test:domain`. |
@@ -171,6 +171,13 @@ state rather than collapsing it:
 
 Collapsing any of them compiles, reads fine, and is wrong in the direction that
 costs somebody money or exposes somebody's shopping.
+
+A fourth arrived with `006_credentials.sql`, and it splits **four** ways rather
+than three. Looking up the password a login was issued returns `current`,
+`changed` (they set their own, so we erased ours), `none` (we never kept one) or
+`unreadable` (a row that will not open — a rotated key). Folding `changed` into
+`none` tells an admin there is nothing on file for an account that is working
+perfectly, and the reset they then issue breaks it. `docs/auth.md`.
 
 ### 6. A write must not destroy what it was not told about
 
