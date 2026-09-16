@@ -51,10 +51,10 @@ cd supabase/test && npm install && npm run all   # the SQL + RLS suite
 There is no lint command. The gate is `npm run typecheck`, `npm run build`,
 `npm run test:domain`, and — for anything touching `supabase/` — the suite in
 `supabase/test`, which runs the migrations and both seeds against a throwaway
-Postgres 18 and asserts **189** things about RLS. **Run all four before claiming
+Postgres 18 and asserts **215** things about RLS. **Run all four before claiming
 a change works.**
 
-And then look at it. Every one of the eighteen bugs in `docs/landmines.md` passed
+And then look at it. Every one of the twenty-one bugs in `docs/landmines.md` passed
 `tsc` and `build` — including a `useMemo` placed below an early return, which
 crashed a route the moment anybody clicked a row; most were found by signing in as the demo firm and walking
 the tabs, or by rendering a component against a fixture. `supabase/seed/001_demo.sql` exists so that is a two-minute
@@ -120,7 +120,7 @@ one address for you.
 | `supabase/migrations/**` | The schema and the RLS policies. Pasted by hand. |
 | `supabase/seed/001_demo.sql` | A whole demo firm — 5 projects, boards, quotes, procurement, ledger, referrals, rewards. Idempotent. |
 | `supabase/seed/002_console.sql` | The demo B2B team, two more firms, prospects, onboarding forms, portfolios, activity. |
-| `supabase/test/**` | Migrations + seeds + 189 RLS assertions against a throwaway Postgres. Its deps are deliberately outside the app's `package.json`. |
+| `supabase/test/**` | Migrations + seeds + 215 RLS assertions against a throwaway Postgres. Its deps are deliberately outside the app's `package.json`. |
 
 ## House rules
 
@@ -239,8 +239,8 @@ Module detail lives in `docs/`, read on demand:
 | `docs/projects.md` | **The Projects tab** — mood boards, not the workspace; sharing, uploads, the PDF, and why `/p/` is exempt from the sign-in gate |
 | `docs/kam-bridge.md` | The outbox that reflects a new referral/visit into the CRM's KAM tab — built here, nothing on the CRM side yet |
 | `docs/open-questions.md` | What is decided by default and needs a human to confirm |
-| `docs/landmines.md` | **Eighteen bugs already shipped or caught here**, kept because the shape of each recurs. Read before trusting a passing build. |
-| `supabase/test/README.md` | What the 189 assertions cover, the `blocked()` vs `unchanged()` distinction, and the two shim details that are load-bearing |
+| `docs/landmines.md` | **Twenty-one bugs already shipped or caught here**, kept because the shape of each recurs. Read before trusting a passing build. |
+| `supabase/test/README.md` | What the 215 assertions cover, the `blocked()` vs `unchanged()` distinction, and the two shim details that are load-bearing |
 
 **When you change behaviour a doc describes, update that doc in the same
 commit.** A doc describing last month's behaviour is worse than no doc, because

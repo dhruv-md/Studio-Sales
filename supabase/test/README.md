@@ -1,6 +1,6 @@
 # SQL tests
 
-Runs every file in `migrations/` (001–006), both files in `seed/`, and an RLS
+Runs every file in `migrations/` (001–007), both files in `seed/`, and an RLS
 isolation suite against a **throwaway Postgres 18** that lives in `./data`. Nothing here touches the real Supabase
 project, and its dependencies are deliberately kept out of the app's
 `package.json` so building the site never downloads Postgres binaries.
@@ -36,7 +36,7 @@ exists` and inflated row counts, not as a clear error.
 
 ## What `rlstest.js` asserts
 
-**189 checks, in twenty-two groups.** Groups 16–20 were added with `005_studio.sql`
+**215 checks, in twenty-six groups.** Groups 16–20 were added with `005_studio.sql`
 and cover escalations and their internal-note split, the referral decision guard
 and Appendix B's reason codes, the phone-reveal log, and notification
 preferences.
@@ -58,6 +58,24 @@ in executable form:
   the guarantee must not rest on one. Also asserted: a login we never kept a
   password for reads `none` and not `changed` — the distinction that stops an
   admin resetting a perfectly good account.
+
+**Groups 23–26 came with `007_studio_v2.sql`**, the client-facing revamp:
+
+- **23** — a referral's linked phone numbers. The demo firm reads the
+  backfilled `'client'` number, adds and removes an `'additional'` one;
+  another firm reads and writes none of it.
+- **24** — scheduling a store visit. A firm can create and edit its own
+  request while it is still `requested`, but cannot touch `status` or the
+  `assigned_bm_*` columns — the market KAM can, an out-of-market one reads
+  nothing.
+- **25** — team invites. A firm can file one and cannot approve it; its own
+  market KAM can see it and still cannot approve it either, because
+  `partner_team_invite` has no UPDATE policy for **anybody**, staff
+  included — only the service role, from `provisionTeamInvite()`.
+- **26** — the Projects tab. A firm's own `studio_project` /
+  `studio_project_space` / `studio_project_item` are readable and writable
+  by that firm alone; an admin and a KAM both read zero rows, the same
+  trust boundary group 8 already checks for the older workspace tables.
 
 Two helpers, and the difference matters:
 

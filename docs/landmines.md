@@ -1,7 +1,7 @@
 # Bugs already shipped here
 
-Eleven, in this repo's first five days. Kept because the **shape** of each one
-recurs, and because every one of them passed `tsc` and `next build` first.
+Twenty-one now. Kept because the **shape** of each one recurs, and because
+every one of them passed `tsc` and `next build` first.
 
 Add to this file when you fix a bug whose shape could come back. Date it, and
 say what it looked like from the user's side — that is the part that makes the
@@ -336,3 +336,45 @@ correctly-refused write as a pass in the other direction. Added `unchanged()`,
 which asserts `rowCount === 0`. **The shape:** "refused" has two shapes in
 Postgres, and a table whose only defence is the *absence* of a policy gets the
 quiet one.
+
+## 19. A public share page redirected to /login
+
+`app/p/[token]` and `app/p/space/[token]` (007, the Projects tab) are meant to
+be opened by anyone with the link, no account needed. `proxy.ts` runs on
+every route except `/login` and `/api/*` and bounces a signed-out visitor to
+`/login` — so the very first load of a shared link, by the person it was
+built for, went straight to a sign-in screen for an app they were never given
+credentials to. Caught before ship by actually opening the link signed out,
+not by `tsc` or `build`, which have no opinion about redirects.
+
+Fixed with an explicit `if (path.startsWith('/p/')) return res` ahead of the
+sign-in check. **The shape:** a global auth gate defaults to closed, so any
+route meant to be public needs its own exemption — the same one `/login`
+already has — and that only shows up by loading the page as a stranger would.
+
+## 20. `create or replace function` refused a wider return type
+
+`my_kam()` (007) grew a `photo_url` column. `create or replace function`
+changed nothing else about it, and Postgres refused with `42P13: cannot
+change return type of existing function … Use DROP FUNCTION my_kam() first`
+— a `returns table (...)` signature is fixed once created; replacing the
+body is fine, widening the OUT parameters is not. **The shape:** any
+`SECURITY DEFINER` function returning `table (...)` needs an explicit `drop
+function` ahead of `create or replace` the day its return shape changes, not
+just the day it is first written.
+
+## 21. A guard trigger written for "admin" silently blocked "any staff"
+
+`visit_request_guard_md_fields()` (007) copied `referral_guard_md_fields()`'s
+shape — `if auth.uid() is null or app_is_admin() then return new` — without
+noticing the two rows mean different people. A referral's decision fields
+really are admin-only; naming a BM for a visit is a KAM's routine job, so the
+first version of the trigger raised `42501` against the market KAM's own
+console action, which read from the outside like "assigning a BM is broken"
+rather than "the wrong function was copied." Caught by the RLS suite
+asserting the KAM case explicitly, not by asserting the partner case and
+assuming staff followed from it. Fixed to `app_is_staff()`. **The shape:**
+copying a guard trigger for a new table copies its bypass condition too, and
+that condition is the one part that has to be re-derived from who is
+actually supposed to write the column, not read off the table it was copied
+from.
