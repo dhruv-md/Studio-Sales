@@ -167,7 +167,7 @@ insert into outreach_touch (id, prospect_id, kind, occurred_at, outcome, note, b
    now() - interval '3 days', 'met', 'Their office, 45 minutes. Two villas and a clubhouse in the pipeline.',
    (select user_id from staff_user where email = 'demo.outreach.hyd@materialdepot.com')),
   ('ffffffff-0000-4000-8000-000000000005', 'eeeeeeee-0000-4000-8000-000000000006', 'call',
-   now() - interval '18 days', 'not_interested', 'Locked into another supplier until next year.',
+   now() - interval '18 days', 'not_interested', 'Locked into a rival supplier until next year.',
    (select user_id from staff_user where email = 'demo.outreach.hyd@materialdepot.com'))
 on conflict (id) do update set
   kind = excluded.kind, occurred_at = excluded.occurred_at,
