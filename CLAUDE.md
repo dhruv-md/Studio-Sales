@@ -235,20 +235,27 @@ the next session will trust it.
 Vercel project `material-depot1/b2b-client-dashboard` →
 <https://b2b-client-dashboard-eight.vercel.app>.
 
-**There is NO Git connection on that project, and a push deploys nothing.**
-Checked against the Vercel API on 2026-09-16: `project.link` is null, and the
-old GitHub repo has no webhook. Every deployment so far has been a `vercel --prod`
-from this directory. This file claimed "built from `main` on push" until then,
-which is the more dangerous kind of wrong — it reads as though shipping is done
-and it is not.
+**Connected to `dhruv-md/Studio-Sales`, and a push to `main` now deploys to
+production.** That became true on 2026-09-16 and had never been true before: the
+project had no Git connection at all until then — `project.link` was null and the
+old repo had no webhook, so every earlier deployment was a `vercel --prod` from
+this directory. This file claimed "built from `main` on push" the whole time,
+which is the more dangerous kind of wrong: it reads as though shipping is
+automatic when nothing was listening.
 
-Connecting `dhruv-md/Studio-Sales` is blocked on GitHub, not on Vercel: the
-Vercel GitHub App is installed only on the **`daaku-daddy`** account
-(`/v1/integrations/git-namespaces` returns that one namespace), and an
-installation on one user account cannot reach a repo owned by another — so
-`vercel git connect` fails with *"You need admin or write access"* even though
-`dhruv-md` has admin on GitHub. It needs the app installed on the `dhruv-md`
-account: <https://github.com/apps/vercel/installations/new>.
+Connecting it needed a step on the GitHub side, worth knowing if it ever has to
+be redone. Vercel reaches GitHub through an App installed **per account**, and it
+was installed on `daaku-daddy` — which cannot see a repo owned by `dhruv-md`, so
+`vercel git connect` failed with *"You need admin or write access"* even though
+`dhruv-md` had admin. The fix is installing the App on the owning account
+(<https://github.com/apps/vercel/installations/new>), and GitHub only offers
+accounts the **currently signed-in** GitHub user administers — so the browser has
+to be signed in as that account first. Both are personal accounts, so this dance
+recurs; moving the repo to an org would end it.
+
+Note the side effect: `/v1/integrations/git-namespaces` now returns only
+`dhruv-md`. `material-depot-site` and `visit-schedule-site` are still linked to
+`daaku-daddy/*` repos — **unverified** whether their push-deploys survived.
 
 `vercel.json` pins `"framework": "nextjs"` **on purpose**: the project was
 originally created with a static preset and every build failed with *No Output
