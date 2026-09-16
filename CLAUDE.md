@@ -61,9 +61,8 @@ job rather than an hour of data entry.
 `supabase/seed/001_demo.sql` are pasted into the Supabase SQL Editor by hand.
 001–004 were applied on 2026-09-11, **005 on 2026-09-16** — verified by probing
 every column, table and function over PostgREST rather than by being told.
-**006 has NOT been pasted yet**: until it is, every login still works and the
-console tells the admin the password was not retained, which is the degraded
-state that migration was written for.
+**006 on 2026-09-16** as well — table, both trailing functions and the anon
+denial all probed live, including a real INSERT attempt.
 `supabase/migrations/README.md` is the checklist and says which of the three
 Material Depot Supabase projects this one is.
 

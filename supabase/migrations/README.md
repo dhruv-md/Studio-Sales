@@ -14,7 +14,7 @@ apply a change to it.
 | `003_roles.sql` | `staff_user`, partner lifecycle columns, the order approval gate, onboarding forms, the outreach pipeline, portfolios, partner activity | ☑ 2026-09-15 |
 | `004_roles_rls.sql` | Policies for all of the above, the partner field guard, `review_portfolio_item()`, `my_kam()` (its `review_referral_order()` was replaced by 005) | ☑ 2026-09-15 |
 | `005_studio.sql` | **PRD v1.1.** The columns the incentive formula cannot run without (per-order coupon, discount availed, delivery date), the §9.2 referral form fields and consent, escalations + their thread, theming, notification preferences, the phone-reveal log, Appendix B reason codes, `review_referral()`, `referral_phone_taken()` | ☑ 2026-09-16 |
-| `006_credentials.sql` | **The issued password, kept until its owner changes it.** `issued_credential` (RLS on, no policies, sealed column), the fingerprint + read + reveal functions, and the trigger on `auth.users` that erases the secret on any password change | ☐ |
+| `006_credentials.sql` | **The issued password, kept until its owner changes it.** `issued_credential` (RLS on, no policies, sealed column), the fingerprint + read + reveal functions, and the trigger on `auth.users` that erases the secret on any password change | ☑ 2026-09-16 |
 | `../seed/001_demo.sql` | Demo data — a firm, 4 clients, 5 projects, boards, quotes, procurement, ledger, referrals, rewards | ☐ |
 | `../seed/002_console.sql` | Demo console data — the team, two more firms, prospects, onboarding forms, portfolios, activity | ☐ |
 
@@ -58,7 +58,28 @@ column, hitting each new table, and calling each new function to see whether it
 003 and 004 sat unticked here for a day after they had actually shipped, which
 is the same failure in the other direction.
 
-**006 degrades rather than breaks, and says which.** Until it is pasted, every
+**006 was applied 2026-09-16 and probed, not assumed.** Over PostgREST with the
+service-role key: `issued_credential` returns `200 []`, `app_read_credential`
+returns `state: "none"` for an unknown uuid (the third state, not an error), and
+`app_note_credential_reveal` returns `204`. That last one is the **final**
+statement in the file and `app_read_credential` the one before it — a paste that
+died partway aborts at the first error, so both answering proves every object
+ahead of them ran, the `auth.users` trigger included. That ordering argument is
+the cheap way to check a long migration without a SQL console.
+
+The security claim was probed too, with the anon key, and includes a real write
+rather than only reads — all four came back `42501`: select on the table, the two
+functions, and an INSERT.
+
+| Probe (anon key) | Result |
+|---|---|
+| `select * from issued_credential` | `42501 permission denied for table` |
+| `rpc/app_read_credential` | `42501 permission denied for function` |
+| `rpc/app_pw_fingerprint` | `42501 permission denied for function` |
+| `INSERT` a row | `42501 permission denied for table` |
+
+**What it looked like before that, kept because it is the shape of every
+unapplied migration here.** Until it was pasted, every
 login still gets created and still works — retention is best-effort by design —
 but the modal says *"the password was NOT retained … copy it now"* instead of
 promising it can be found again, and tapping a name returns the error naming
