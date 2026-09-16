@@ -2,8 +2,8 @@ import { supabaseServer } from '@/lib/supabase/server'
 import { fail, ok, type Result } from './result'
 import type {
   Board, BoardItem, Client, FinanceEntry, ProcurementItem, Project, ProjectArea,
-  Quote, QuoteLine, Referral, ReferralEvent, ReferralOrder, RewardClaim, RewardTier,
-  PortfolioItem, PartnerActivity, Escalation, EscalationComment, NotificationPref,
+  Quote, QuoteLine, Referral, ReferralEvent, ReferralOrder, ReferralPhone, RewardClaim, RewardTier,
+  PortfolioItem, PartnerActivity, Escalation, EscalationComment, NotificationPref, VisitRequest,
 } from '@/lib/domain/types'
 
 /**
@@ -128,6 +128,23 @@ export const listReferralOrders = (referralIds: string[]) =>
         'referred orders',
       )
     : Promise.resolve(ok<ReferralOrder[]>([]))
+
+export const listReferralPhones = (referralIds: string[]) =>
+  referralIds.length
+    ? many<ReferralPhone>(
+        (sb) => sb.from('referral_phone').select('*').in('referral_id', referralIds).order('created_at'),
+        'the numbers linked to your clients',
+      )
+    : Promise.resolve(ok<ReferralPhone[]>([]))
+
+export const listVisitRequests = (referralIds: string[]) =>
+  referralIds.length
+    ? many<VisitRequest>(
+        (sb) =>
+          sb.from('visit_request').select('*').in('referral_id', referralIds).order('scheduled_on', { ascending: false }),
+        'the visits you have scheduled',
+      )
+    : Promise.resolve(ok<VisitRequest[]>([]))
 
 // ----------------------------------------------------------------- rewards
 

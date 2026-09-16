@@ -257,6 +257,8 @@ export type Referral = {
   city?: string | null
   locality?: string | null
   project_type?: 'residential' | 'commercial' | 'other' | null
+  /** free text, only meaningful when project_type is 'other' */
+  project_type_other?: string | null
   budget_band?: string | null
   timeline?: string | null
   categories?: string[]
@@ -272,6 +274,43 @@ export type Referral = {
   reviewed_at?: string | null
   review_note?: string | null
   attribution_expires_on?: string | null
+  /** 007_studio_v2.sql — set once the CRM outbox has fetched this referral. */
+  pushed_at?: string | null
+}
+
+/** 007_studio_v2.sql — every number this client is known to place orders
+ *  through, not just `referral.md_phone`. Cart/order matching reads all of
+ *  them; see `docs/referrals.md`. */
+export type ReferralPhone = {
+  id: string
+  referral_id: string
+  phone: string
+  label: 'partner' | 'client' | 'additional'
+  added_by: string | null
+  created_at: string
+}
+
+export type VisitRequestStatus = 'requested' | 'bm_assigned' | 'completed' | 'cancelled'
+
+/** 007_studio_v2.sql — a store visit scheduled for a referred client. The
+ *  first one is created alongside the referral; later ones are "schedule
+ *  another visit" against the same client. */
+export type VisitRequest = {
+  id: string
+  referral_id: string
+  ec_name: string | null
+  scheduled_on: string
+  scheduled_time: string
+  categories: string[]
+  requirements: string | null
+  notes: string | null
+  status: VisitRequestStatus
+  assigned_bm_name: string | null
+  assigned_bm_phone: string | null
+  assigned_bm_email: string | null
+  assigned_bm_photo_url: string | null
+  created_at: string
+  updated_at: string
 }
 
 export type ReferralEventType =

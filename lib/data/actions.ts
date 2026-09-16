@@ -5,6 +5,7 @@ import { supabaseServer } from '@/lib/supabase/server'
 import { fail, ok, type Result } from './result'
 import { phone10 } from '@/lib/format'
 import type { CatalogPick } from '@/lib/catalog/types'
+import type { Referral } from '@/lib/domain/types'
 
 /**
  * Every mutation. Two rules hold throughout:
@@ -513,18 +514,18 @@ export async function deleteFinanceEntry(id: string, projectId: string) {
 // --------------------------------------------------------------- referrals
 
 /**
- * PRD §9.2 — refer a client.
+ * Refer a client — the studio revamp's version of the form.
  *
- * The form carries more than a name and a number now, and two of the additions
- * are not cosmetic:
+ * Always a brand-new referral now: the old "pick one of your clients" selector
+ * pulled from the opt-in workspace's own client list, which is a different
+ * concept from a referred client and confused the two. Scheduling a further
+ * visit for an existing referral is `scheduleVisit()` below, which re-asks
+ * nothing about who the client is.
  *
- * **Consent.** §14.5 makes the partner's tick a REQUIRED field, because without
- * it Material Depot has no lawful basis to show that client's store visits and
- * cart to a third party at all. It is stored as `consent_claimed_at` — the
- * partner saying the client agreed — and NOT as `consent_given`, which only
- * Material Depot can set after confirming it with the client directly. A firm
- * that could set the second one could unlock another person's purchase history
- * by ticking a box about them.
+ * The first store visit is created alongside the referral, in the same call —
+ * a referral with no visit scheduled is not what the form promised. If the
+ * visit half fails, the referral is rolled back rather than left as a client
+ * record nobody asked to see.
  *
  * **The duplicate pre-check runs before this** (`checkReferralPhone`), not here.
  * §9.2: "never let a partner submit blind and get rejected later." This function
@@ -534,18 +535,17 @@ export async function deleteFinanceEntry(id: string, projectId: string) {
 export async function createReferral(input: {
   client_name: string
   md_phone: string
-  client_id?: string | null
-  project_id?: string | null
-  notes?: string | null
-  email?: string | null
   city?: string | null
-  locality?: string | null
+  email?: string | null
   project_type?: 'residential' | 'commercial' | 'other' | null
-  budget_band?: string | null
-  timeline?: string | null
+  project_type_other?: string | null
   categories?: string[]
-  consent?: boolean
-}) {
+  requirements?: string | null
+  notes?: string | null
+  ec_name?: string | null
+  scheduled_on: string
+  scheduled_time: string
+}): Promise<Result<Referral>> {
   const pid = await partnerId()
   if (!pid.ok) return pid
   if (!input.client_name?.trim()) return fail('The referral needs the client’s name.')
@@ -556,48 +556,107 @@ export async function createReferral(input: {
       'A referral needs the client’s exact 10-digit mobile number — that is the only thing that links their store visits and orders back to you.',
     )
   }
-  // Hard-gated, not soft-gated. Everywhere else in Material Depot's apps a
-  // "mandatory" field is soft-gated and logged, because a blocked field stops
-  // real work in a store. This one is different: it is the lawful basis under
-  // the DPDP Act for showing one person's shopping to somebody else, and §14.5
-  // names it as a launch blocker for the journey view.
-  if (input.consent !== true) {
-    return fail(
-      'We need you to confirm the client is happy for Material Depot to contact them and to share what they do with us. Without that we cannot show you their visits or their cart.',
-    )
+  if (!input.scheduled_on || !input.scheduled_time) {
+    return fail('When is the EC expected to visit? A date and time are needed to let the store know.')
   }
 
   const values: Row = {
     partner_id: pid.data,
-    client_id: input.client_id || null,
-    project_id: input.project_id || null,
     client_name: input.client_name.trim(),
     md_phone: phone,
     notes: input.notes?.trim() || null,
-    consent_claimed_at: new Date().toISOString(),
-  }
-  const text = (v: string | null | undefined) => (v === undefined ? undefined : v?.trim() || null)
-  for (const k of ['email', 'city', 'locality', 'budget_band', 'timeline'] as const) {
-    const v = text(input[k])
-    if (v !== undefined) values[k] = v
+    email: input.email?.trim() || null,
+    city: input.city?.trim() || null,
   }
   if (input.project_type) values.project_type = input.project_type
+  if (input.project_type === 'other') values.project_type_other = input.project_type_other?.trim() || null
   if (input.categories?.length) values.categories = input.categories
 
-  const r = await insert('referral', values, 'this referral', '/referrals')
+  const r = await insert<Referral>('referral', values, 'this referral', '/referrals')
 
   if (!r.ok && /duplicate key|unique/i.test(r.error)) {
     return fail(`You have already referred ${phone}. Open that referral to see where it has got to.`)
   }
-  if (!r.ok && /consent_claimed_at|column .* does not exist/i.test(r.error)) {
-    // 005_studio.sql has not been pasted into this project yet. Say which file,
+  if (!r.ok && /column .* does not exist/i.test(r.error)) {
+    // 005/007 have not been pasted into this project yet. Say which files,
     // rather than showing the raw Postgres message — the fix is a paste, and
     // the person reading this is the person who can do it.
     return fail(
-      'This Material Depot workspace has not had supabase/migrations/005_studio.sql applied yet, so the referral form cannot save the consent record. Tell your key account manager; nothing you typed has been lost.',
+      'This Material Depot workspace is missing a recent database migration, so the referral form cannot save every field. Tell your key account manager; nothing you typed has been lost.',
     )
   }
+  if (!r.ok) return r
+
+  const visit = await insert('visit_request', {
+    referral_id: r.data.id,
+    ec_name: input.ec_name?.trim() || null,
+    scheduled_on: input.scheduled_on,
+    scheduled_time: input.scheduled_time,
+    categories: input.categories?.length ? input.categories : [],
+    requirements: input.requirements?.trim() || null,
+  }, 'the visit for this referral')
+
+  if (!visit.ok) {
+    await remove('referral', r.data.id, 'this referral')
+    return fail(`The referral could not be scheduled, so nothing was saved: ${visit.error}`)
+  }
   return r
+}
+
+/**
+ * "Schedule another visit" — a repeat store visit for a client already
+ * referred. Re-asks nothing about who the client is: only the visit-specific
+ * fields the form actually shows. `status` and the BM fields are set only by
+ * Material Depot; the guard trigger on `visit_request` enforces that even if
+ * this action tried to send them.
+ */
+export async function scheduleVisit(input: {
+  referral_id: string
+  ec_name?: string | null
+  scheduled_on: string
+  scheduled_time: string
+  categories?: string[]
+  requirements?: string | null
+  notes?: string | null
+}) {
+  if (!input.referral_id) return fail('Which client is this visit for?')
+  if (!input.scheduled_on || !input.scheduled_time) {
+    return fail('A date and time are needed to let the store know when to expect them.')
+  }
+  return insert('visit_request', {
+    referral_id: input.referral_id,
+    ec_name: input.ec_name?.trim() || null,
+    scheduled_on: input.scheduled_on,
+    scheduled_time: input.scheduled_time,
+    categories: input.categories?.length ? input.categories : [],
+    requirements: input.requirements?.trim() || null,
+    notes: input.notes?.trim() || null,
+  }, 'this visit', '/referrals')
+}
+
+export async function updateVisitRequest(id: string, values: { requirements?: string | null; notes?: string | null; scheduled_on?: string; scheduled_time?: string; categories?: string[] }) {
+  return update('visit_request', id, values, 'this visit', '/referrals')
+}
+
+/**
+ * A client can place an order through more than one number — their own,
+ * their partner's, or one they never mentioned at referral time. Additive to
+ * `referral.md_phone`; RLS refuses adding a number to somebody else's
+ * referral, and lets a firm remove only a number IT added ('additional'),
+ * never the original 'client' number that came off the referral form.
+ */
+export async function addReferralPhone(referralId: string, phone: string, label: 'partner' | 'client' | 'additional' = 'additional') {
+  const ten = phone10(phone)
+  if (!ten) return fail('That is not a ten-digit Indian mobile number.')
+  const r = await insert('referral_phone', { referral_id: referralId, phone: ten, label }, 'this number', '/referrals')
+  if (!r.ok && /duplicate key|unique/i.test(r.error)) {
+    return fail('That number is already linked to this client.')
+  }
+  return r
+}
+
+export async function removeReferralPhone(id: string) {
+  return remove('referral_phone', id, 'this number', '/referrals')
 }
 
 /**

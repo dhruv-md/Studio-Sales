@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import {
-  listEscalationComments, listEscalations, listReferralEvents, listReferralOrders, listReferrals, listClients,
+  listEscalationComments, listEscalations, listReferralEvents, listReferralOrders, listReferralPhones,
+  listReferrals, listVisitRequests,
 } from '@/lib/data/queries'
 import { ReferralsView } from '@/components/referrals/ReferralsView'
 import { PageHead } from '@/components/shell/PageHead'
@@ -29,12 +30,12 @@ export default async function ReferralsPage({
   const { client, new: openNew } = await searchParams
   const today = todayIST()
 
-  const [referrals, clients] = await Promise.all([listReferrals(), listClients()])
+  const referrals = await listReferrals()
 
   if (!referrals.ok) {
     return (
       <>
-        <PageHead title="Your clients" />
+        <PageHead title="Clients" />
         <div className="px-4 py-5 md:px-6">
           <Problem title="Your clients could not be loaded" detail={referrals.error} />
         </div>
@@ -43,10 +44,12 @@ export default async function ReferralsPage({
   }
 
   const ids = referrals.data.map((r) => r.id)
-  const [events, orders, escalations] = await Promise.all([
+  const [events, orders, escalations, visits, phones] = await Promise.all([
     listReferralEvents(ids, 500),
     listReferralOrders(ids),
     listEscalations(),
+    listVisitRequests(ids),
+    listReferralPhones(ids),
   ])
 
   const comments = escalations.ok
@@ -76,7 +79,7 @@ export default async function ReferralsPage({
   return (
     <>
       <PageHead
-        title="Your clients"
+        title="Clients"
         hint="Clients you have sent to Material Depot. You see where they went, what is in their cart, and what they ordered."
       />
       <div className="space-y-5 px-4 py-5 md:px-6">
@@ -120,7 +123,6 @@ export default async function ReferralsPage({
 
         <ReferralsView
           referrals={referrals.data}
-          clients={clients.ok ? clients.data : []}
           events={events.ok ? events.data : []}
           orders={all}
           eventsError={events.ok ? null : events.error}
@@ -129,6 +131,10 @@ export default async function ReferralsPage({
           escalations={escalations.ok ? escalations.data : []}
           escalationComments={comments.ok ? comments.data : []}
           escalationsError={escalations.ok ? null : escalations.error}
+          visits={visits.ok ? visits.data : []}
+          visitsError={visits.ok ? null : visits.error}
+          phones={phones.ok ? phones.data : []}
+          phonesError={phones.ok ? null : phones.error}
           today={today}
         />
       </div>

@@ -243,23 +243,71 @@ Searching the list by phone works on the full number even though the display is
 masked. An architect typing a number they already have is not a privacy event,
 and making them reveal first to find someone would be security theatre.
 
-## The referral form — PRD §9.2
+## The referral form — client-facing revamp
 
-The duplicate check runs **before** submit, on blur of the phone field, and has
-four outcomes: `free`, `yours`, `taken`, `unknown`. The fourth is what makes it
-honest — if the lookup fails, the form says the check could not run and lets the
-partner submit. A check that silently reports "clear" when it did not run is
-worse than no check, because it is a promise.
+Rewritten for the studio revamp. It is now a pure **new**-referral form —
+picking from an existing client (the old "one of your clients" selector) used
+to pull from the opt-in workspace's own client list, a different concept that
+just confused the two, so it is gone. Fields: client name, mobile number,
+city, EC expected to visit + date + time, project type (residential /
+commercial / something else, with a free-text describe), categories
+interested in (`lib/domain/categories.ts` — Tiles, Laminates, Wooden
+flooring, Wallpaper, Wall panels, Plywood, Cords, Bathroom accessories,
+Hardware), description of requirements, additional notes.
+
+The duplicate check still runs **before** submit, on blur of the phone field,
+with the same four outcomes: `free`, `yours`, `taken`, `unknown`. The fourth is
+what makes it honest — if the lookup fails, the form says the check could not
+run and lets the partner submit. A check that silently reports "clear" when it
+did not run is worse than no check, because it is a promise.
 
 `taken` never says *who* holds the number. That is another firm's client list,
 which is why `referral_phone_taken()` in `005_studio.sql` answers exactly one
 bit.
 
-Consent is a **hard** gate, in the form and again in `createReferral()`.
-Everywhere else in Material Depot's apps a "mandatory" field is soft-gated and
-logged, because a blocked field stops real work in a store. This one is the
-lawful basis for showing one person's shopping to somebody else, and §14.5 names
-it a launch blocker for the journey view.
+**The consent checkbox is gone, on instruction** — it read as "a stupid
+performative thing" rather than a real ask, and the new field list has no room
+for it either. `consent_claimed_at` is simply never written by this form now;
+`consent_given` (Material Depot confirming with the client directly) was
+never the partner's to set anyway, so nothing about §14.5's aggregate-vs-
+itemised view changed — a referral just starts in the same "not asked" state
+every referral used to start in before this form existed. If a written consent
+capture is wanted again later, it is a field on this form and nothing else.
+
+## The first visit is part of the referral, not a separate step
+
+`createReferral()` creates the referral **and** its first `visit_request` row
+(007_studio_v2.sql) in one call — a referral with no visit scheduled is not
+what the form promised. If the visit insert fails, the referral is rolled back
+rather than left as a client record nobody asked to see.
+
+**Scheduling another visit** (`ScheduleVisitForm`, reached from a client's own
+page) re-asks nothing about who the client is — only EC expected, date, time,
+categories for that visit, and requirements. `scheduleVisit()` in
+`lib/data/actions.ts`.
+
+`visit_request.status` and the `assigned_bm_*` columns are Material Depot's
+side: a KAM coordinates with the store and names a BM once one is assigned,
+and `visit_request_guard_md_fields()` freezes those columns against a
+partner's own write the same way `referral_guard_md_fields()` does for a
+referral's decision fields — any staff role may set them, not only an admin,
+because assigning a BM is a KAM's day-to-day job. `VisitLog` renders every
+visit against a client, and the BM's name/phone/email/photo once assigned.
+
+## More than one phone number per client
+
+A client does not always order through the number they were referred on —
+sometimes it is their partner's own number, sometimes one that was never
+mentioned at all. `referral_phone` (007_studio_v2.sql) holds every number
+linked to a referral, seeded with the original `md_phone` as a `'client'` row;
+`NumbersPanel` lets a firm add more (`'partner'` or `'additional'`) and remove
+ones it added, but never the original.
+
+`POST /api/sync/referrals`'s phone resolution reads both sources — a hit on
+`referral.md_phone` OR on any `referral_phone` row counts, deduplicated by
+referral id so a phone matching a referral on both is one match, not two. The
+`ambiguous` rule is unchanged: two DIFFERENT referrals both claiming a phone,
+across either source, is still reported and skipped rather than guessed.
 
 ## Reason codes — PRD Appendix B
 

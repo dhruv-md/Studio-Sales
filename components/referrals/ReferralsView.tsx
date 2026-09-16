@@ -2,9 +2,9 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Lock, Plus, Search, Trash2, UserPlus } from 'lucide-react'
+import { ArrowLeft, CalendarPlus, Lock, Plus, Search, Trash2, UserPlus } from 'lucide-react'
 import type {
-  Client, Escalation, EscalationComment, Referral, ReferralEvent,
+  Escalation, EscalationComment, Referral, ReferralEvent, ReferralPhone, VisitRequest,
 } from '@/lib/domain/types'
 import {
   Badge, Button, Card, CardHead, Empty, Input, Problem, Select, Table, Td, Th,
@@ -13,6 +13,9 @@ import { Modal } from '@/components/ui/Modal'
 import { ReferralFeed } from './ReferralFeed'
 import { CartPanel } from './CartPanel'
 import { ReferClientForm } from './ReferClientForm'
+import { ScheduleVisitForm } from './ScheduleVisitForm'
+import { VisitLog } from './VisitLog'
+import { NumbersPanel } from './NumbersPanel'
 import { MaskedPhone } from './MaskedPhone'
 import { ClientOrders, OrdersFooter } from './ClientOrders'
 import { Escalations } from './Escalations'
@@ -34,11 +37,10 @@ import { date, inr, inrShort, relative } from '@/lib/format'
  * credited, and it would sit there looking fine.
  */
 export function ReferralsView({
-  referrals, clients, events, orders, eventsError, initialOpenId, openNew,
-  escalations, escalationComments, escalationsError, today,
+  referrals, events, orders, eventsError, initialOpenId, openNew,
+  escalations, escalationComments, escalationsError, visits, visitsError, phones, phonesError, today,
 }: {
   referrals: Referral[]
-  clients: Client[]
   events: ReferralEvent[]
   orders: LedgerOrder[]
   eventsError?: string | null
@@ -49,10 +51,15 @@ export function ReferralsView({
   escalations: Escalation[]
   escalationComments: EscalationComment[]
   escalationsError?: string | null
+  visits: VisitRequest[]
+  visitsError?: string | null
+  phones: ReferralPhone[]
+  phonesError?: string | null
   today: string
 }) {
   const router = useRouter()
   const [adding, setAdding] = useState(Boolean(openNew))
+  const [schedulingVisit, setSchedulingVisit] = useState(false)
   const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null)
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
@@ -172,14 +179,19 @@ export function ReferralsView({
                   </span>
                 }
                 action={
-                  <button
-                    onClick={() => remove(open.id)}
-                    disabled={pending}
-                    className="rounded-md p-1.5 text-ink-faint transition hover:bg-bad-soft hover:text-bad"
-                    title="Remove this referral"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <Button size="sm" onClick={() => setSchedulingVisit(true)}>
+                      <CalendarPlus size={13} /> Schedule another visit
+                    </Button>
+                    <button
+                      onClick={() => remove(open.id)}
+                      disabled={pending}
+                      className="rounded-md p-1.5 text-ink-faint transition hover:bg-bad-soft hover:text-bad"
+                      title="Remove this referral"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 }
               />
               {itemised ? (
@@ -234,6 +246,24 @@ export function ReferralsView({
 
           <div className="space-y-4">
             <Card>
+              <CardHead title="Visits" hint="Every store visit scheduled for this client" />
+              {visitsError ? (
+                <div className="px-4 py-3"><Problem title="Visits could not be loaded" detail={visitsError} /></div>
+              ) : (
+                <VisitLog visits={visits.filter((v) => v.referral_id === open.id)} />
+              )}
+            </Card>
+
+            <Card>
+              <CardHead title="Numbers linked to this client" hint="Carts and orders on any of these count for them" />
+              {phonesError ? (
+                <div className="px-4 py-3"><Problem title="Numbers could not be loaded" detail={phonesError} /></div>
+              ) : (
+                <NumbersPanel referralId={open.id} phones={phones.filter((p) => p.referral_id === open.id)} />
+              )}
+            </Card>
+
+            <Card>
               <CardHead title="In their cart" hint="The last cart we saw at a Material Depot store" />
               {itemised ? (
                 <CartPanel cart={s?.cart ?? { state: 'none' }} />
@@ -266,6 +296,19 @@ export function ReferralsView({
             ) : null}
           </div>
         </div>
+
+        <Modal
+          open={schedulingVisit}
+          onClose={() => setSchedulingVisit(false)}
+          title={`Schedule a visit for ${open.client_name}`}
+          hint="Their details are already on file — just what this visit is about."
+        >
+          <ScheduleVisitForm
+            referralId={open.id}
+            onDone={() => setSchedulingVisit(false)}
+            onCancel={() => setSchedulingVisit(false)}
+          />
+        </Modal>
       </>
     )
   }
@@ -405,7 +448,7 @@ export function ReferralsView({
         title="Refer a client"
         hint="Their exact mobile number is what links their visits and orders back to you."
       >
-        <ReferClientForm clients={clients} onDone={() => setAdding(false)} onCancel={() => setAdding(false)} />
+        <ReferClientForm onDone={() => setAdding(false)} onCancel={() => setAdding(false)} />
       </Modal>
     </>
   )

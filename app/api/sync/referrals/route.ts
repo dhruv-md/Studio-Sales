@@ -120,11 +120,43 @@ export async function POST(req: Request) {
 
   // A phone can legitimately appear under two partners — two architects both
   // claiming the same client. That is a human decision, not a heuristic one.
-  const byPhone = new Map<string, { id: string; partner_id: string }[]>()
+  //
+  // A client is not only matched on `referral.md_phone` — 007_studio_v2.sql's
+  // `referral_phone` holds every OTHER number a firm has linked to a client
+  // (their own number, an additional one), and a cart or order on any of them
+  // belongs to the same client. Both sources feed the same map, deduplicated
+  // by referral id: a phone that happens to equal both a referral's md_phone
+  // AND one of its own referral_phone rows is one match, not two.
+  const byPhone = new Map<string, Map<string, { id: string; partner_id: string }>>()
+  function addHit(phone: string, hit: { id: string; partner_id: string }) {
+    const hits = byPhone.get(phone) ?? new Map()
+    hits.set(hit.id, hit)
+    byPhone.set(phone, hits)
+  }
   for (const r of referrals ?? []) {
-    const list = byPhone.get(r.md_phone) ?? []
-    list.push({ id: r.id, partner_id: r.partner_id })
-    byPhone.set(r.md_phone, list)
+    addHit(r.md_phone, { id: r.id, partner_id: r.partner_id })
+  }
+
+  const referralById = new Map((referrals ?? []).map((r) => [r.id, r]))
+  const { data: extraPhones, error: extraErr } = await db
+    .from('referral_phone')
+    .select('phone, referral_id')
+    .in('phone', [...phones])
+  if (extraErr) {
+    return NextResponse.json({ error: `referral_phone lookup failed: ${extraErr.message}` }, { status: 500 })
+  }
+  const missingReferralIds = [...new Set((extraPhones ?? []).map((p) => p.referral_id).filter((id) => !referralById.has(id)))]
+  if (missingReferralIds.length) {
+    const { data: more, error: moreErr } = await db
+      .from('referral')
+      .select('id, partner_id, md_phone')
+      .in('id', missingReferralIds)
+    if (moreErr) return NextResponse.json({ error: `referral lookup failed: ${moreErr.message}` }, { status: 500 })
+    for (const r of more ?? []) referralById.set(r.id, r)
+  }
+  for (const p of extraPhones ?? []) {
+    const ref = referralById.get(p.referral_id)
+    if (ref) addHit(p.phone, { id: ref.id, partner_id: ref.partner_id })
   }
 
   function resolve(rawPhone: string, key: string): { id: string; partner_id: string } | null {
@@ -133,7 +165,7 @@ export async function POST(req: Request) {
       skipped.push({ key, reason: 'bad_phone', detail: rawPhone })
       return null
     }
-    const hits = byPhone.get(p) ?? []
+    const hits = [...(byPhone.get(p)?.values() ?? [])]
     if (hits.length === 1) return hits[0]
     if (hits.length === 0) {
       skipped.push({ key, reason: 'no_match', detail: p })

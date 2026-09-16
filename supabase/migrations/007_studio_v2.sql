@@ -46,6 +46,9 @@ grant execute on function my_kam() to authenticated;
 -- linked to a referral, not just `referral.md_phone` — so this table is
 -- additive to that column, never a replacement for it.
 
+-- "Something else, describe" on the referral form's project type.
+alter table referral add column if not exists project_type_other text;
+
 -- Delivery bookkeeping for the CRM outbox poll (phase 7) — a new referral is
 -- partner-owned data the CRM needs to read, so this marks what it has already
 -- fetched. Never surfaced to a partner, and added to the same guard trigger
