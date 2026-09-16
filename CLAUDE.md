@@ -106,6 +106,7 @@ one address for you.
 | `app/login` | Email + password. Phone-OTP is the intended production login — see `docs/auth.md`. |
 | `app/api/catalog/search` | Server proxy to Material Depot's catalogue. **Blocked today by Cloudflare, with Django CSRF behind it** — `docs/catalogue.md`. |
 | `app/api/sync/referrals` | Push endpoint for referral events and orders. Service-role, shared-secret. |
+| `app/api/sync/outbox`, `app/api/sync/visit-assignment` | The other direction — new referrals/visits out to the CRM, and a BM assignment back in. `docs/kam-bridge.md`. |
 | `app/api/upload` | The only door into the `studio-media` Storage bucket — checks the caller's session, then writes with the service role. |
 | `app/p/**` | Public, unauthenticated presentation pages for a shared Project or Space — `proxy.ts` exempts this path from the sign-in gate. |
 | `lib/domain/**` | The rules, and no I/O. Money, quantity, areas, markets, the internal tiering and the per-client rollup — plus the incentive programme: `slabs.ts` (the §10 ladders), `ledger.ts` (attribution, maturation, the statement), `periods.ts` (calendar months in string space), `programme.ts` (**every §17 default, in one file**), `privacy.ts` (§14.5), `reasons.ts` (Appendix B), `theme.ts` (§13.3 + the AA gate). |
@@ -236,6 +237,7 @@ Module detail lives in `docs/`, read on demand:
 | `docs/analytics.md` | §14.6 — the one wrapper, the taxonomy, and what is deliberately not wired |
 | `docs/settings.md` | §13 — profile, team, the theme and its WCAG gate, notifications, and the Sign-in tab on both apps |
 | `docs/projects.md` | **The Projects tab** — mood boards, not the workspace; sharing, uploads, the PDF, and why `/p/` is exempt from the sign-in gate |
+| `docs/kam-bridge.md` | The outbox that reflects a new referral/visit into the CRM's KAM tab — built here, nothing on the CRM side yet |
 | `docs/open-questions.md` | What is decided by default and needs a human to confirm |
 | `docs/landmines.md` | **Eighteen bugs already shipped or caught here**, kept because the shape of each recurs. Read before trusting a passing build. |
 | `supabase/test/README.md` | What the 189 assertions cover, the `blocked()` vs `unchanged()` distinction, and the two shim details that are load-bearing |
