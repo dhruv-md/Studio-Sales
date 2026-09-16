@@ -9,6 +9,7 @@ import { monthKey, quarterKey, todayIST } from '@/lib/domain/periods'
 import { SlabProgress } from '@/components/rewards/SlabProgress'
 import { CoinWall } from '@/components/rewards/CoinWall'
 import { ProgrammeTerms, RewardLedger } from '@/components/rewards/RewardLedger'
+import { RewardCompare } from '@/components/rewards/RewardCompare'
 import { PageHead } from '@/components/shell/PageHead'
 import { Card, Problem, Stat } from '@/components/ui'
 import { inr, inrShort } from '@/lib/format'
@@ -32,6 +33,7 @@ const TABS = [
   { key: 'month', label: 'This month' },
   { key: 'quarter', label: 'This quarter' },
   { key: 'ledger', label: 'Statement' },
+  { key: 'compare', label: 'Compare' },
   { key: 'terms', label: 'Programme terms' },
 ] as const
 
@@ -166,6 +168,8 @@ export default async function RewardsPage({
         ) : null}
 
         {active === 'ledger' ? <RewardLedger rows={rows} /> : null}
+
+        {active === 'compare' ? <RewardCompare /> : null}
 
         {active === 'terms' ? <ProgrammeTerms goLive={GO_LIVE} version={PROGRAMME_VERSION} /> : null}
       </div>
