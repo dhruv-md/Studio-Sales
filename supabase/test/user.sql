@@ -18,3 +18,13 @@ insert into auth.users (id, email) values
   ('5ca1ab1e-0000-4000-8000-000000000005', 'demo.outreach.hyd@materialdepot.com'),
   ('5ca1ab1e-0000-4000-8000-000000000006', 'demo.inbound@materialdepot.com')
 on conflict (email) do nothing;
+
+-- The four extra PARTNER logins seed/003_bulk_variety.sql attaches (Verandah,
+-- Chettinad, Foundry, Aranya) plus one associate teammate. Same fiction.
+insert into auth.users (id, email) values
+  ('5ca1ab1e-0000-4000-8000-000000000011', 'demo.verandah@example.in'),
+  ('5ca1ab1e-0000-4000-8000-000000000012', 'demo.chettinad@example.in'),
+  ('5ca1ab1e-0000-4000-8000-000000000013', 'demo.foundry@materialdepot.com'),
+  ('5ca1ab1e-0000-4000-8000-000000000014', 'demo.aranya@materialdepot.com'),
+  ('5ca1ab1e-0000-4000-8000-000000000015', 'demo.aranya.associate@materialdepot.com')
+on conflict (email) do nothing;
