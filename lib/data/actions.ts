@@ -84,7 +84,7 @@ export async function createClient(input: {
     city: input.city?.trim() || null,
     address: input.address?.trim() || null,
     notes: input.notes?.trim() || null,
-  }, 'this client', '/clients')
+  }, 'this client', '/workspace/clients')
 }
 
 export async function updateClient(id: string, values: Row) {
@@ -93,11 +93,11 @@ export async function updateClient(id: string, values: Row) {
     if (!p) return fail('That is not a 10-digit Indian mobile number.')
     values.phone = p
   }
-  return update('client', id, values, 'this client', '/clients')
+  return update('client', id, values, 'this client', '/workspace/clients')
 }
 
 export async function deleteClient(id: string) {
-  return remove('client', id, 'this client', '/clients')
+  return remove('client', id, 'this client', '/workspace/clients')
 }
 
 // ---------------------------------------------------------------- projects
@@ -130,18 +130,18 @@ export async function createProject(input: {
     design_fee: input.design_fee ?? null,
     target_on: input.target_on || null,
     started_on: new Date().toISOString().slice(0, 10),
-  }, 'this project', '/projects')
+  }, 'this project', '/workspace/projects')
 }
 
 export async function updateProject(id: string, values: Row) {
-  const r = await update('project', id, values, 'this project', `/projects/${id}`)
-  revalidatePath('/projects')
+  const r = await update('project', id, values, 'this project', `/workspace/projects/${id}`)
+  revalidatePath('/workspace/projects')
   revalidatePath('/dashboard')
   return r
 }
 
 export async function deleteProject(id: string) {
-  return remove('project', id, 'this project', '/projects')
+  return remove('project', id, 'this project', '/workspace/projects')
 }
 
 // ------------------------------------------------------------------- areas
@@ -162,15 +162,15 @@ export async function createArea(input: {
     floor_area_sqft: input.floor_area_sqft ?? null,
     wall_area_sqft: input.wall_area_sqft ?? null,
     sort_order: input.sort_order ?? 0,
-  }, 'this room', `/projects/${input.project_id}`)
+  }, 'this room', `/workspace/projects/${input.project_id}`)
 }
 
 export async function updateArea(id: string, projectId: string, values: Row) {
-  return update('project_area', id, values, 'this room', `/projects/${projectId}`)
+  return update('project_area', id, values, 'this room', `/workspace/projects/${projectId}`)
 }
 
 export async function deleteArea(id: string, projectId: string) {
-  return remove('project_area', id, 'this room', `/projects/${projectId}`)
+  return remove('project_area', id, 'this room', `/workspace/projects/${projectId}`)
 }
 
 // ------------------------------------------------------------------ boards
@@ -377,20 +377,20 @@ export async function buildQuoteFromApprovedBoards(projectId: string, markupPct:
     return fail(`Quote v${version} was created but its lines failed to save: ${lineErr.message}. Delete it and try again.`)
   }
 
-  revalidatePath(`/projects/${projectId}`)
+  revalidatePath(`/workspace/projects/${projectId}`)
   return ok({ quote_id: quote.id as string, version, lines: lines.length, skipped })
 }
 
 export async function updateQuote(id: string, projectId: string, values: Row) {
-  return update('quote', id, values, 'this quote', `/projects/${projectId}`)
+  return update('quote', id, values, 'this quote', `/workspace/projects/${projectId}`)
 }
 
 export async function updateQuoteLine(id: string, projectId: string, values: Row) {
-  return update('quote_line', id, values, 'this line', `/projects/${projectId}`)
+  return update('quote_line', id, values, 'this line', `/workspace/projects/${projectId}`)
 }
 
 export async function deleteQuoteLine(id: string, projectId: string) {
-  return remove('quote_line', id, 'this line', `/projects/${projectId}`)
+  return remove('quote_line', id, 'this line', `/workspace/projects/${projectId}`)
 }
 
 /**
@@ -439,15 +439,15 @@ export async function acceptQuote(quoteId: string, projectId: string) {
   const { error: pErr } = await sb.from('project').update({ stage: 'procurement' }).eq('id', projectId)
   if (pErr) return fail(`Quote accepted and list seeded, but the project stage did not move: ${pErr.message}`)
 
-  revalidatePath(`/projects/${projectId}`)
-  revalidatePath('/projects')
+  revalidatePath(`/workspace/projects/${projectId}`)
+  revalidatePath('/workspace/projects')
   return ok({ seeded: fresh.length, alreadyThere: lines.length - fresh.length })
 }
 
 // ------------------------------------------------------------- procurement
 
 export async function updateProcurementItem(id: string, projectId: string, values: Row) {
-  return update('procurement_item', id, values, 'this line', `/projects/${projectId}`)
+  return update('procurement_item', id, values, 'this line', `/workspace/projects/${projectId}`)
 }
 
 export async function addProcurementItem(input: {
@@ -467,11 +467,11 @@ export async function addProcurementItem(input: {
     qty_required: input.qty_required,
     rate: input.rate,
     area_label: input.area_label || null,
-  }, 'this line', `/projects/${input.project_id}`)
+  }, 'this line', `/workspace/projects/${input.project_id}`)
 }
 
 export async function deleteProcurementItem(id: string, projectId: string) {
-  return remove('procurement_item', id, 'this line', `/projects/${projectId}`)
+  return remove('procurement_item', id, 'this line', `/workspace/projects/${projectId}`)
 }
 
 // ----------------------------------------------------------------- finance
@@ -499,15 +499,15 @@ export async function addFinanceEntry(input: {
     settled: input.settled ?? false,
     counterparty: input.counterparty?.trim() || null,
     reference: input.reference?.trim() || null,
-  }, 'this entry', `/projects/${input.project_id}`)
+  }, 'this entry', `/workspace/projects/${input.project_id}`)
 }
 
 export async function updateFinanceEntry(id: string, projectId: string, values: Row) {
-  return update('finance_entry', id, values, 'this entry', `/projects/${projectId}`)
+  return update('finance_entry', id, values, 'this entry', `/workspace/projects/${projectId}`)
 }
 
 export async function deleteFinanceEntry(id: string, projectId: string) {
-  return remove('finance_entry', id, 'this entry', `/projects/${projectId}`)
+  return remove('finance_entry', id, 'this entry', `/workspace/projects/${projectId}`)
 }
 
 // --------------------------------------------------------------- referrals

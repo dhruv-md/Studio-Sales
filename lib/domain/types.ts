@@ -359,6 +359,7 @@ export type StaffUser = {
   market: string | null
   active: boolean
   created_at: string
+  photo_url: string | null
 }
 
 /** What `my_kam()` returns to a partner. Their KAM, never anyone else's. */
@@ -367,6 +368,9 @@ export type MyKam = {
   phone: string | null
   email: string | null
   market: string | null
+  /** Link, not upload — same pattern as `partner.logo_url`. Null is common;
+   *  the card falls back to an initials/icon avatar rather than a broken image. */
+  photo_url: string | null
 }
 
 export type ApplicationStatus = 'submitted' | 'approved' | 'rejected' | 'provisioned'

@@ -80,7 +80,7 @@ export default async function PartnerAsSeenPage({ params }: { params: Promise<{ 
     ? (team.ok ? team.data : []).find((s) => s.user_id === firm.kam_user_id && s.active)
     : undefined
   const kam: MyKam | null = kamRow
-    ? { name: kamRow.name, phone: kamRow.phone, email: kamRow.email, market: kamRow.market }
+    ? { name: kamRow.name, phone: kamRow.phone, email: kamRow.email, market: kamRow.market, photo_url: kamRow.photo_url }
     : null
 
   const problems = [

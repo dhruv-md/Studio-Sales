@@ -41,6 +41,10 @@ const VIEW_EVENT: Record<string, (typeof EV)[keyof typeof EV]> = {
   '/dashboard': EV.overview_viewed,
   '/referrals': EV.client_list_viewed,
   '/rewards': EV.rewards_viewed,
+  // `/projects` is now the mood-board Projects tab; the relocated opt-in
+  // workspace's project list gets its own name so the two are never conflated
+  // in the numbers.
   '/projects': EV.project_opened,
+  '/workspace/projects': EV.workspace_project_opened,
   '/settings': EV.profile_edited,
 }

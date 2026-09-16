@@ -652,6 +652,84 @@ async function asUser(c, uid, fn) {
     } finally { await c.query('rollback') }
   })())
 
+  console.log('\n23. Multiple phone numbers on a referral (007)')
+  // The migration backfills every PRE-EXISTING referral's md_phone into this
+  // table — which in this harness means referrals present when `npm run
+  // migrate` ran, before `npm run seed` created the demo firm's. That
+  // ordering is a harness artifact (in production, 007 runs against years of
+  // real referrals); seed one in directly to test the steady-state shape.
+  await c.query('begin')
+  await c.query(
+    `insert into referral_phone (referral_id, phone, label) values ($1,'9845112233','client')
+     on conflict (referral_id, phone) do nothing`, [REF_SHARMA])
+  await c.query('commit')
+
+  await asUser(c, DEMO_UID, async () => {
+    check('the demo firm reads the client number on its own referral',
+      (await count(`select count(*)::int n from referral_phone where referral_id = $1 and label = 'client'`,
+        [REF_SHARMA])) === 1)
+    await c.query('savepoint sp2')
+    const ins = await c.query(
+      `insert into referral_phone (referral_id, phone, label) values ($1,'9812345678','additional') returning id`,
+      [REF_SHARMA])
+    check('and can add an additional number to it', ins.rowCount === 1)
+    const del = await c.query('delete from referral_phone where id = $1', [ins.rows[0].id])
+    check('and remove one it added', del.rowCount === 1)
+    await c.query('rollback to savepoint sp2')
+  })
+
+  await asUser(c, OTHER_UID, async () => {
+    check('another firm reads none of it', (await count(
+      'select count(*)::int n from referral_phone where referral_id = $1', [REF_SHARMA])) === 0)
+    await unchanged('and cannot add a number to somebody else’s referral',
+      `insert into referral_phone (referral_id, phone, label) values ($1,'9812345678','additional')`, [REF_SHARMA])
+  })
+
+  console.log('\n24. Scheduling a store visit (007)')
+  let visitId
+  await c.query('begin')
+  const vr = await c.query(
+    `insert into visit_request (referral_id, scheduled_on, scheduled_time, categories, requirements)
+     values ($1, current_date + 3, '11:00', array['Tiles'], 'First visit') returning id`, [REF_SHARMA])
+  visitId = vr.rows[0].id
+  await c.query('commit')
+
+  await asUser(c, DEMO_UID, async () => {
+    check('the demo firm reads its own visit request',
+      (await count('select count(*)::int n from visit_request where id = $1', [visitId])) === 1)
+    await c.query('savepoint sp3')
+    const upd = await c.query(`update visit_request set requirements = 'Updated brief' where id = $1`, [visitId])
+    check('and can edit it while it is still just requested', upd.rowCount === 1)
+    await c.query('rollback to savepoint sp3')
+    await blocked('but cannot assign a BM to its own request',
+      `update visit_request set status = 'bm_assigned', assigned_bm_name = 'Self Assigned' where id = $1`,
+      [visitId])
+  })
+
+  await asUser(c, OTHER_UID, async () => {
+    check('another firm reads none of it',
+      (await count('select count(*)::int n from visit_request where id = $1', [visitId])) === 0)
+    await unchanged('and cannot create one against somebody else’s referral',
+      `insert into visit_request (referral_id, scheduled_on, scheduled_time)
+       values ($1, current_date + 1, '10:00')`, [REF_SHARMA])
+  })
+
+  await asUser(c, KAM_BLR_UID, async () => {
+    const upd = await c.query(
+      `update visit_request set status = 'bm_assigned', assigned_bm_name = 'Ramesh (Whitefield)',
+              assigned_bm_phone = '9900011234' where id = $1`, [visitId])
+    check('the market KAM can assign a BM', upd.rowCount === 1)
+  })
+
+  await asUser(c, KAM_HYD_UID, async () => {
+    check('a KAM outside the market reads none of it',
+      (await count('select count(*)::int n from visit_request where id = $1', [visitId])) === 0)
+  })
+
+  await c.query('begin')
+  await c.query('delete from visit_request where id = $1', [visitId])
+  await c.query('commit')
+
   console.log(`\n${pass} passed, ${fail} failed`)
   await c.end()
   process.exit(fail ? 1 : 0)

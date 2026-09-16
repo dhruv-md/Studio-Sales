@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
-  Award, Building2, ClipboardCheck, GalleryVerticalEnd, LayoutDashboard,
-  Palette, PhoneCall, Settings, ShieldCheck, UserPlus, Users, UsersRound,
+  Award, Building2, ClipboardCheck, FolderKanban, GalleryVerticalEnd, LayoutDashboard,
+  Layers, Palette, PhoneCall, Settings, ShieldCheck, UserPlus, Users, UsersRound,
 } from 'lucide-react'
 import type { Partner, StaffRole } from '@/lib/domain/types'
 
@@ -10,10 +10,13 @@ export type NavItem = { href: string; label: string; icon: LucideIcon; blurb: st
 /**
  * What a partner sees.
  *
- * Five items, always. Referred clients, rewards and portfolio are the whole
- * proposition on day one — see what your clients did with us, see what you have
- * earned, get your work on our site — and none of them asks a designer to move
- * anything they already have somewhere else.
+ * Six items, always, in the order the studio-facing revamp asks for: Overview,
+ * Clients, Projects, Portfolio, Rewards, Settings. None of them asks a designer
+ * to move anything they already have somewhere else.
+ *
+ * "Projects" here is mood boards and inspiration spaces for a client's job —
+ * a different, much lighter feature from the opt-in design/quote/procurement
+ * workspace below, which used to sit at this same URL. Do not conflate them.
  *
  * The project workspace (design boards, quotes, procurement, project P&L) is
  * real, finished and hidden. An architect who has just been handed a login by a
@@ -24,15 +27,22 @@ export type NavItem = { href: string; label: string; icon: LucideIcon; blurb: st
  */
 const PARTNER_CORE: NavItem[] = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, blurb: 'Everything at a glance' },
-  { href: '/referrals', label: 'Your clients', icon: Building2, blurb: 'What they did at Material Depot' },
-  { href: '/rewards', label: 'Rewards', icon: Award, blurb: 'Your incentive ladder' },
+  { href: '/referrals', label: 'Clients', icon: Building2, blurb: 'Who you referred, and what they did' },
+  { href: '/projects', label: 'Projects', icon: Palette, blurb: 'Mood boards and inspiration' },
   { href: '/portfolio', label: 'Portfolio', icon: GalleryVerticalEnd, blurb: 'Your work, on our site' },
+  { href: '/rewards', label: 'Rewards', icon: Award, blurb: 'Your incentive ladder' },
   { href: '/settings', label: 'Settings', icon: Settings, blurb: 'Your studio, your team, your theme' },
 ]
 
+/**
+ * The opt-in workspace, relocated off `/projects` and `/clients` once those
+ * URLs became the core Projects and Clients tabs above. Same code, same
+ * `workspace_enabled` gate — only the address and the label changed, so the
+ * sidebar never shows two things called "Projects."
+ */
 const PARTNER_WORKSPACE: NavItem[] = [
-  { href: '/projects', label: 'Projects', icon: Palette, blurb: 'Design, quote, procure' },
-  { href: '/clients', label: 'Clients', icon: Users, blurb: 'Who you are working for' },
+  { href: '/workspace/projects', label: 'Design workspace', icon: FolderKanban, blurb: 'Design, quote, procure' },
+  { href: '/workspace/clients', label: 'Workspace clients', icon: Layers, blurb: 'Who you are working for' },
 ]
 
 export function partnerNav(partner: Pick<Partner, 'workspace_enabled'>): NavItem[] {

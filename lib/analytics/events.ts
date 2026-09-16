@@ -51,7 +51,7 @@ export const EV = {
   programme_terms_opened: 'programme_terms_opened',
   coin_wall_viewed: 'coin_wall_viewed',
 
-  // ---- Projects — "is the procurement funnel being fed?"
+  // ---- Projects — mood boards and inspiration spaces
   project_created: 'project_created',
   project_opened: 'project_opened',
   space_created: 'space_created',
@@ -60,6 +60,12 @@ export const EV = {
   board_item_added: 'board_item_added',
   palette_browsed: 'palette_browsed',
   palette_saved_to_space: 'palette_saved_to_space',
+  project_shared: 'project_shared',
+  project_pdf_exported: 'project_pdf_exported',
+
+  // ---- The opt-in design/quote/procurement workspace, kept distinct from
+  // the Projects tab above so the two are never conflated in the numbers.
+  workspace_project_opened: 'workspace_project_opened',
   sku_chip_clicked: 'sku_chip_clicked',
   wishlist_toggled: 'wishlist_toggled',
   board_item_compared: 'board_item_compared',

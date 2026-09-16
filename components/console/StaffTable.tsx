@@ -60,6 +60,7 @@ export function StaffTable({ team, meId, error }: { team: StaffUser[]; meId: str
         phone: String(form.get('phone') ?? ''),
         role: String(form.get('role') ?? 'outreach') as StaffRole,
         market: String(form.get('market') ?? '') || null,
+        photo_url: String(form.get('photo_url') ?? '') || null,
       })
       if (!res.ok) return setProblem(res.error)
       setAdding(false)
@@ -84,7 +85,7 @@ export function StaffTable({ team, meId, error }: { team: StaffUser[]; meId: str
         ) : (
           <Table>
             <thead>
-              <tr><Th>Name</Th><Th>Role</Th><Th>Market</Th><Th>Contact</Th><Th>Added</Th><Th>Active</Th></tr>
+              <tr><Th>Name</Th><Th>Role</Th><Th>Market</Th><Th>Contact</Th><Th>Photo</Th><Th>Added</Th><Th>Active</Th></tr>
             </thead>
             <tbody>
               {team.map((s) => {
@@ -132,6 +133,20 @@ export function StaffTable({ team, meId, error }: { team: StaffUser[]; meId: str
                     <Td className="text-xs text-ink-soft">
                       <span className="block truncate">{s.email ?? '—'}</span>
                       <span className="tnum block text-ink-faint">{s.phone ?? '—'}</span>
+                    </Td>
+                    <Td>
+                      <Input
+                        key={s.photo_url ?? ''}
+                        defaultValue={s.photo_url ?? ''}
+                        placeholder="Photo URL"
+                        disabled={pending}
+                        className="h-8 w-36 text-xs"
+                        onBlur={(e) => {
+                          const next = e.target.value.trim() || null
+                          if (next === (s.photo_url ?? null)) return
+                          run(() => updateStaffMember(s.user_id, { photo_url: next }))
+                        }}
+                      />
                     </Td>
                     <Td className="text-xs text-ink-faint">{date(s.created_at)}</Td>
                     <Td>
@@ -200,6 +215,9 @@ export function StaffTable({ team, meId, error }: { team: StaffUser[]; meId: str
               </Select>
             </Field>
           </div>
+          <Field label="Photo URL" hint="Optional. Shown on a partner's KAM card so they know who they are calling.">
+            <Input name="photo_url" placeholder="https://…" />
+          </Field>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={pending}>

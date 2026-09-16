@@ -138,11 +138,18 @@ for them.
 An architect who has just been handed a login by a supplier is not going to move
 their client pricing into it on day one, and a sidebar full of modules they have
 not asked for is what makes the whole thing look like a system to be managed.
-`partnerNav()` drops those items, and `app/(app)/projects/**` and
-`app/(app)/clients/**` each check the flag as well — a hidden nav item is still
-a URL anyone can type.
+`partnerNav()` drops those items, and `app/(app)/workspace/projects/**` and
+`app/(app)/workspace/clients/**` each check the flag as well — a hidden nav item
+is still a URL anyone can type.
 
 An admin turns it on from the firm's page in the console.
+
+**Moved off `/projects` and `/clients` in the client-facing revamp.** Those
+URLs are now the always-on mood-board Projects tab and the referred-clients
+Clients tab — a different feature each, described in `docs/projects.md` and
+`docs/referrals.md`. The opt-in workspace kept its code and its flag, only its
+address and its nav label changed (`Design workspace` / `Workspace clients`),
+so the sidebar never shows two things called "Projects."
 
 ## Bootstrapping the first admin
 

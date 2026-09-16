@@ -2,17 +2,22 @@
 
 **Material Depot for Partners** — two apps on one deployment.
 
-`app/(app)/**` is what an architect or interior designer sees: the clients they
-referred to us and what those clients did, their incentive slabs, and their
-portfolio. It is built to **`Studio-Sales-Dashboard-PRD-v1.1`** — the section
-numbers quoted throughout the code and docs are that document's.
+`app/(app)/**` is what an architect or interior designer sees, in six tabs:
+Overview, Clients, Projects, Portfolio, Rewards, Settings. It is built to
+**`Studio-Sales-Dashboard-PRD-v1.1`** plus the client-facing revamp on top of
+it — the section numbers quoted throughout the code and docs are the PRD's.
 
-The unit on that home page is the **client**, not the event — one row
-per person referred, their timeline behind the name, and what is sitting in
-their cart. It was a merged feed of everybody's events first, and that is the
-shape a log file has, not the shape the question has. Behind a per-firm flag
-there is also a full project workspace — design boards, quotes, procurement,
-project finances — **off by default**.
+The unit on Clients is the **client**, not the event — one row per person
+referred, their timeline behind the name, and what is sitting in their cart.
+It was a merged feed of everybody's events first, and that is the shape a log
+file has, not the shape the question has.
+
+**Projects** (mood boards, `docs/projects.md`) is a different, much lighter
+feature from the opt-in design/quote/procurement workspace that used to live
+at this URL. That workspace is real, finished, and now lives at
+`/workspace/projects` and `/workspace/clients`, gated by a per-firm flag and
+**off by default** — see "The project workspace is opt-in" in `docs/roles.md`.
+Do not conflate the two "Projects."
 
 `app/(console)/**` is Material Depot's own B2B team: an admin who verifies
 orders and issues logins, KAMs, outreach and inbound managers. Read

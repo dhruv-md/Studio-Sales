@@ -53,7 +53,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     <>
       <PageHead
         title={c.name}
-        crumbs={[{ href: '/clients', label: 'Clients' }, { label: c.name }]}
+        crumbs={[{ href: '/workspace/clients', label: 'Clients' }, { label: c.name }]}
         hint={
           <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
             {c.phone ? <span className="tnum inline-flex items-center gap-1"><Phone size={12} /> {c.phone}</span> : null}
@@ -89,7 +89,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             <ul className="divide-y divide-line">
               {mine.map((p) => (
                 <li key={p.id}>
-                  <Link href={`/projects/${p.id}`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-raised">
+                  <Link href={`/workspace/projects/${p.id}`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-raised">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-ink">{p.name}</p>
                       <p className="text-xs text-ink-faint">

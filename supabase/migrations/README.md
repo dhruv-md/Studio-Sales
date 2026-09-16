@@ -15,6 +15,7 @@ apply a change to it.
 | `004_roles_rls.sql` | Policies for all of the above, the partner field guard, `review_portfolio_item()`, `my_kam()` (its `review_referral_order()` was replaced by 005) | ☑ 2026-09-15 |
 | `005_studio.sql` | **PRD v1.1.** The columns the incentive formula cannot run without (per-order coupon, discount availed, delivery date), the §9.2 referral form fields and consent, escalations + their thread, theming, notification preferences, the phone-reveal log, Appendix B reason codes, `review_referral()`, `referral_phone_taken()` | ☑ 2026-09-16 |
 | `006_credentials.sql` | **The issued password, kept until its owner changes it.** `issued_credential` (RLS on, no policies, sealed column), the fingerprint + read + reveal functions, and the trigger on `auth.users` that erases the secret on any password change | ☑ 2026-09-16 |
+| `007_studio_v2.sql` | **The client-facing revamp.** `staff_user.photo_url` + `my_kam()` returning it, `referral_phone` (multiple numbers per referred client), `visit_request` (scheduling a store visit, and the BM assigned to it) | ☐ |
 | `../seed/001_demo.sql` | Demo data — a firm, 4 clients, 5 projects, boards, quotes, procurement, ledger, referrals, rewards | ☐ |
 | `../seed/002_console.sql` | Demo console data — the team, two more firms, prospects, onboarding forms, portfolios, activity | ☐ |
 

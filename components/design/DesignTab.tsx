@@ -28,7 +28,7 @@ export function DesignTab({ project, areas, boards, items }: WorkspaceProps) {
   const [editing, setEditing] = useState<ProjectArea | null>(null)
   const [adding, setAdding] = useState(false)
 
-  const path = `/projects/${project.id}`
+  const path = `/workspace/projects/${project.id}`
   const openArea = areas.find((a) => a.id === openAreaId) ?? null
 
   if (openArea) {

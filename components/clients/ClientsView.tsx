@@ -92,7 +92,7 @@ export function ClientsView({ clients, projects }: { clients: Client[]; projects
                 return (
                   <tr key={c.id} className="transition hover:bg-raised">
                     <Td>
-                      <Link href={`/clients/${c.id}`} className="font-medium text-ink hover:text-brand">
+                      <Link href={`/workspace/clients/${c.id}`} className="font-medium text-ink hover:text-brand">
                         {c.name}
                       </Link>
                       {c.email ? <div className="text-xs text-ink-faint">{c.email}</div> : null}

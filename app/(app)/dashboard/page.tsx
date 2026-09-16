@@ -94,7 +94,6 @@ export default async function DashboardPage({
 
   const referredInRange = referrals.ok ? referrals.data.filter((r) => within(dayOf(r.referred_on), range)) : []
   const referredBefore = referrals.ok ? referrals.data.filter((r) => within(dayOf(r.referred_on), before)) : []
-  const pending = all.filter((o) => o.approval_status === 'pending' && within(dayOf(o.ordered_on), range))
 
   const month = monthStanding(all, monthKey(today), today)
   const wall = coinWall(all, today)
@@ -137,12 +136,10 @@ export default async function DashboardPage({
       why: 'Their store visits, cart and orders then show up against their name here.',
     },
     {
-      label: workspace ? 'Create your first project' : 'Put a project in your portfolio',
-      done: workspace ? live.length > 0 : (portfolio.ok ? portfolio.data.length : 0) > 0,
-      href: workspace ? '/projects?new=1' : '/portfolio',
-      why: workspace
-        ? 'Rooms, boards and the quote all hang off a project.'
-        : 'Published work gets a page on materialdepot.com with your firm’s card on it.',
+      label: 'Put a project in your portfolio',
+      done: (portfolio.ok ? portfolio.data.length : 0) > 0,
+      href: '/portfolio',
+      why: 'Published work gets a page on materialdepot.com with your firm’s card on it.',
     },
   ]
 
@@ -152,15 +149,9 @@ export default async function DashboardPage({
         title={`Good to see you, ${firstName}`}
         hint="What the clients you sent us have been doing, and where that has got you."
         action={
-          workspace ? (
-            <Link href="/projects?new=1">
-              <Button variant="primary"><Plus size={15} /> New project</Button>
-            </Link>
-          ) : (
-            <Link href="/referrals?new=1">
-              <Button variant="primary"><Plus size={15} /> Refer a client</Button>
-            </Link>
-          )
+          <Link href="/referrals?new=1">
+            <Button variant="primary"><Plus size={15} /> Refer a client</Button>
+          </Link>
         }
       />
 
@@ -182,8 +173,15 @@ export default async function DashboardPage({
 
         {/* §8.2.2's metric cards. Every one has the range on it and goes
             somewhere — a number a partner cannot drill into is a number they
-            have to ring somebody about. */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            have to ring somebody about.
+
+            "Waiting on us" used to sit here as a fourth tile. Removed: with
+            orders arriving pending far more often than not, a running count
+            of "what Material Depot has not yet checked" read as a complaint
+            about Material Depot rather than something useful to the
+            partner — it is still visible per-order on the ledger, just not
+            promoted to a headline number. */}
+        <div className="grid gap-3 sm:grid-cols-3">
           <MetricCard
             label="Revenue contributed"
             range={range.label}
@@ -216,18 +214,6 @@ export default async function DashboardPage({
             }
             href="/rewards"
             tone="brand"
-          />
-          <MetricCard
-            label="Waiting on us"
-            range={range.label}
-            value={pending.length ? inrShort(pending.reduce((s, o) => s + Number(o.order_value || 0), 0)) : '—'}
-            hint={
-              pending.length
-                ? `${pending.length} order${pending.length === 1 ? '' : 's'} we are still verifying`
-                : 'Nothing waiting on us'
-            }
-            href="/rewards?tab=ledger"
-            tone={pending.length ? 'warn' : undefined}
           />
         </div>
 
@@ -269,10 +255,10 @@ export default async function DashboardPage({
         {workspace ? (
           <Card>
             <CardHead
-              title="Projects on the board"
+              title="Workspace projects on the board"
               hint="Where each one has got to"
               action={
-                <Link href="/projects" className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline">
+                <Link href="/workspace/projects" className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline">
                   All projects <ArrowRight size={12} />
                 </Link>
               }
@@ -283,7 +269,7 @@ export default async function DashboardPage({
               <Empty
                 title="No active projects yet"
                 body="Add your first client, then a project. Rooms, inspiration boards and the quote all hang off it."
-                action={<Link href="/projects?new=1"><Button variant="primary"><Plus size={15} /> New project</Button></Link>}
+                action={<Link href="/workspace/projects?new=1"><Button variant="primary"><Plus size={15} /> New project</Button></Link>}
               />
             ) : (
               <ul className="divide-y divide-line">
@@ -291,7 +277,7 @@ export default async function DashboardPage({
                   const stage = STAGES.find((s) => s.key === p.stage)
                   return (
                     <li key={p.id}>
-                      <Link href={`/projects/${p.id}`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-raised">
+                      <Link href={`/workspace/projects/${p.id}`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-raised">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium text-ink">{p.name}</p>
                           <p className="truncate text-xs text-ink-faint">

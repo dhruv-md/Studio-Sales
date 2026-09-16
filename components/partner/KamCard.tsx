@@ -67,9 +67,18 @@ export function KamCard({ kam, error }: { kam: MyKam | null; error?: string | nu
           </div>
         ) : (
           <div className="flex items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
-              <UserRound size={18} />
-            </span>
+            {kam.photo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element -- a partner-pasted link, not one of our own optimised assets
+              <img
+                src={kam.photo_url}
+                alt={kam.name}
+                className="size-10 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
+                <UserRound size={18} />
+              </span>
+            )}
             <div className="min-w-0">
               <p className="font-display text-[15px] font-semibold text-ink">{kam.name}</p>
               <p className="text-xs text-ink-faint">

@@ -70,7 +70,7 @@ export function ProjectsView({
       })
       if (!res.ok) return setError(res.error)
       setOpen(false)
-      router.push(`/projects/${(res.data as Project).id}`)
+      router.push(`/workspace/projects/${(res.data as Project).id}`)
     })
   }
 
@@ -115,7 +115,7 @@ export function ProjectsView({
           <ul className="grid gap-0 divide-y divide-line">
             {shown.map((p) => (
               <li key={p.id}>
-                <Link href={`/projects/${p.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 transition hover:bg-raised">
+                <Link href={`/workspace/projects/${p.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 transition hover:bg-raised">
                   <div className="min-w-[12rem] flex-1">
                     <p className="text-sm font-medium text-ink">{p.name}</p>
                     <p className="text-xs text-ink-faint">
@@ -146,7 +146,7 @@ export function ProjectsView({
           <Empty
             title="Add a client first"
             body="Every project belongs to a client, so that their store visits and orders can be tied back to it."
-            action={<Link href="/clients"><Button variant="primary">Go to Clients</Button></Link>}
+            action={<Link href="/workspace/clients"><Button variant="primary">Go to Clients</Button></Link>}
           />
         ) : (
           <form action={submit} className="space-y-3">

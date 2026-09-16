@@ -69,7 +69,7 @@ export function ProjectWorkspace(props: WorkspaceProps) {
     <>
       <PageHead
         title={project.name}
-        crumbs={[{ href: '/projects', label: 'Projects' }, { label: project.name }]}
+        crumbs={[{ href: '/workspace/projects', label: 'Projects' }, { label: project.name }]}
         hint={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             <span>{clientName ?? 'Client'}</span>

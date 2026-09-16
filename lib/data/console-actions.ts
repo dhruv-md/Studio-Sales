@@ -795,6 +795,7 @@ export async function createStaffMember(input: {
   phone?: string | null
   role: StaffRole
   market?: string | null
+  photo_url?: string | null
 }): Promise<Result<IssuedCredentials>> {
   const staff = await requireStaff(['admin'])
   if (!staff.ok) return staff
@@ -822,6 +823,7 @@ export async function createStaffMember(input: {
     phone: input.phone?.trim() || null,
     role: input.role,
     market: input.market || null,
+    photo_url: input.photo_url?.trim() || null,
   })
   if (error) {
     await svc.auth.admin.deleteUser(created.user.id)
@@ -879,7 +881,7 @@ export async function resetStaffPassword(userId: string): Promise<Result<IssuedC
   })
 }
 
-export async function updateStaffMember(userId: string, values: { role?: StaffRole; market?: string | null; active?: boolean; phone?: string | null; name?: string }) {
+export async function updateStaffMember(userId: string, values: { role?: StaffRole; market?: string | null; active?: boolean; phone?: string | null; name?: string; photo_url?: string | null }) {
   const staff = await requireStaff(['admin'])
   if (!staff.ok) return staff
 
