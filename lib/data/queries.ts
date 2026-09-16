@@ -4,7 +4,7 @@ import type {
   Board, BoardItem, Client, FinanceEntry, ProcurementItem, Project, ProjectArea,
   Quote, QuoteLine, Referral, ReferralEvent, ReferralOrder, ReferralPhone, RewardClaim, RewardTier,
   PortfolioItem, PartnerActivity, Escalation, EscalationComment, NotificationPref, VisitRequest,
-  PartnerTeamInvite,
+  PartnerTeamInvite, StudioProject, StudioProjectItem, StudioProjectSpace, StudioProjectTemplate,
 } from '@/lib/domain/types'
 
 /**
@@ -146,6 +146,34 @@ export const listVisitRequests = (referralIds: string[]) =>
         'the visits you have scheduled',
       )
     : Promise.resolve(ok<VisitRequest[]>([]))
+
+// ------------------------------------------------------- studio projects
+
+export const listStudioProjects = () =>
+  many<StudioProject>((sb) => sb.from('studio_project').select('*').order('updated_at', { ascending: false }), 'your projects')
+
+export const getStudioProject = (id: string) =>
+  one<StudioProject>((sb) => sb.from('studio_project').select('*').eq('id', id).maybeSingle(), 'this project')
+
+export const listStudioSpaces = (projectId: string) =>
+  many<StudioProjectSpace>(
+    (sb) => sb.from('studio_project_space').select('*').eq('project_id', projectId).order('sort_order').order('created_at'),
+    'the spaces on this project',
+  )
+
+export const listStudioItems = (spaceIds: string[]) =>
+  spaceIds.length
+    ? many<StudioProjectItem>(
+        (sb) => sb.from('studio_project_item').select('*').in('space_id', spaceIds).order('sort_order').order('created_at'),
+        'what is saved in your spaces',
+      )
+    : Promise.resolve(ok<StudioProjectItem[]>([]))
+
+export const listStudioTemplates = () =>
+  many<StudioProjectTemplate>(
+    (sb) => sb.from('studio_project_template').select('*').order('created_at'),
+    'your presentation styles',
+  )
 
 export const listTeamInvites = () =>
   many<PartnerTeamInvite>(

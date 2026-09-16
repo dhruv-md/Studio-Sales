@@ -279,3 +279,130 @@ create policy partner_team_invite_insert on partner_team_invite for insert to au
 -- level (`associate`) — display only, so the console's own team list can say
 -- "Design team" or "Procurement" rather than just "Associate".
 alter table partner_user add column if not exists title text;
+
+-- ============================ F. Projects — mood boards and inspiration
+
+-- Deliberately named `studio_*` and kept entirely separate from `project`
+-- (the opt-in design/quote/procurement workspace, now at `/workspace/projects`)
+-- — different columns, different purpose, and the two must never be confused.
+-- Same trust boundary as everything else a firm creates for its own clients:
+-- no staff read policy exists on any of these three tables, and none should.
+create table if not exists studio_project (
+  id                uuid primary key default gen_random_uuid(),
+  partner_id        uuid not null references partner(id) on delete cascade,
+  name              text not null,
+  description       text,
+  project_type      text check (project_type is null or project_type in ('residential','commercial','other')),
+  project_type_other text,
+  city              text,
+  society           text,
+  -- A referred client (linked, autofilled) OR an unreferred one (typed by
+  -- hand) OR neither — a project-only mood board. Never both: the guard below
+  -- keeps that true regardless of what the client sends.
+  referral_id       uuid references referral(id) on delete set null,
+  client_name       text,
+  client_phone      text,
+  cover_url         text,
+  share_token       text unique,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+create index if not exists studio_project_partner_idx on studio_project(partner_id);
+
+create table if not exists studio_project_space (
+  id           uuid primary key default gen_random_uuid(),
+  project_id   uuid not null references studio_project(id) on delete cascade,
+  name         text not null,
+  sort_order   int not null default 0,
+  share_token  text unique,
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists studio_project_space_project_idx on studio_project_space(project_id);
+
+-- One polymorphic table for every inspiration item in a space — an image, a
+-- video, a saved Palette link, or a product reference link — rather than
+-- three near-identical tables for what is, to this schema, the same thing:
+-- a URL with a caption and a position.
+create table if not exists studio_project_item (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references studio_project_space(id) on delete cascade,
+  kind        text not null check (kind in ('image','video','palette_link','product_link')),
+  url         text not null,
+  caption     text,
+  source      text not null default 'manual' check (source in ('upload','palette','manual')),
+  sort_order  int not null default 0,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists studio_project_item_space_idx on studio_project_item(space_id);
+
+-- The "template" the brief asks for, kept minimal: a saved presentation
+-- style applied to a share/PDF. The firm's own name and logo (`partner.
+-- firm_name`, `partner.logo_url`) are used automatically; this is only the
+-- extra bit worth naming and reusing across projects.
+create table if not exists studio_project_template (
+  id            uuid primary key default gen_random_uuid(),
+  partner_id    uuid not null references partner(id) on delete cascade,
+  name          text not null,
+  accent_color  text,
+  intro_note    text,
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists studio_project_template_partner_idx on studio_project_template(partner_id);
+
+alter table studio_project enable row level security;
+alter table studio_project_space enable row level security;
+alter table studio_project_item enable row level security;
+alter table studio_project_template enable row level security;
+
+drop policy if exists studio_project_all on studio_project;
+create policy studio_project_all on studio_project for all to authenticated
+  using (partner_id in (select app_partner_ids()))
+  with check (partner_id in (select app_partner_ids()));
+
+drop policy if exists studio_project_space_all on studio_project_space;
+create policy studio_project_space_all on studio_project_space for all to authenticated
+  using (exists (select 1 from studio_project p where p.id = project_id and p.partner_id in (select app_partner_ids())))
+  with check (exists (select 1 from studio_project p where p.id = project_id and p.partner_id in (select app_partner_ids())));
+
+drop policy if exists studio_project_item_all on studio_project_item;
+create policy studio_project_item_all on studio_project_item for all to authenticated
+  using (
+    exists (
+      select 1 from studio_project_space s join studio_project p on p.id = s.project_id
+       where s.id = space_id and p.partner_id in (select app_partner_ids())
+    )
+  )
+  with check (
+    exists (
+      select 1 from studio_project_space s join studio_project p on p.id = s.project_id
+       where s.id = space_id and p.partner_id in (select app_partner_ids())
+    )
+  );
+
+drop policy if exists studio_project_template_all on studio_project_template;
+create policy studio_project_template_all on studio_project_template for all to authenticated
+  using (partner_id in (select app_partner_ids()))
+  with check (partner_id in (select app_partner_ids()));
+
+-- Public share pages read by SERVICE ROLE only (app/p/[token]), never by a
+-- grant to `anon` — the token itself is the capability, and an RLS policy
+-- that let anon select by token would also let anon enumerate every project
+-- with a share link by guessing or brute force. No policy here for anon,
+-- deliberately: `for all to authenticated` above is the only grant.
+
+-- ================================================== Storage: project media
+
+-- The first upload capability in this app. Public-read (a presentation link
+-- has to load images without a session), and — deliberately — NO storage.objects
+-- policy for `authenticated` either: every upload goes through
+-- `app/api/upload/route.ts`, which checks the caller's session itself and then
+-- writes with the service role. A client-side policy permissive enough to
+-- upload would also be permissive enough to overwrite another firm's files by
+-- guessing a path.
+insert into storage.buckets (id, name, public)
+values ('studio-media', 'studio-media', true)
+on conflict (id) do nothing;

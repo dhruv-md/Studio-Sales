@@ -106,6 +106,8 @@ one address for you.
 | `app/login` | Email + password. Phone-OTP is the intended production login — see `docs/auth.md`. |
 | `app/api/catalog/search` | Server proxy to Material Depot's catalogue. **Blocked today by Cloudflare, with Django CSRF behind it** — `docs/catalogue.md`. |
 | `app/api/sync/referrals` | Push endpoint for referral events and orders. Service-role, shared-secret. |
+| `app/api/upload` | The only door into the `studio-media` Storage bucket — checks the caller's session, then writes with the service role. |
+| `app/p/**` | Public, unauthenticated presentation pages for a shared Project or Space — `proxy.ts` exempts this path from the sign-in gate. |
 | `lib/domain/**` | The rules, and no I/O. Money, quantity, areas, markets, the internal tiering and the per-client rollup — plus the incentive programme: `slabs.ts` (the §10 ladders), `ledger.ts` (attribution, maturation, the statement), `periods.ts` (calendar months in string space), `programme.ts` (**every §17 default, in one file**), `privacy.ts` (§14.5), `reasons.ts` (Appendix B), `theme.ts` (§13.3 + the AA gate). |
 | `lib/analytics/**` | §14.6's single instrumentation layer. **The only place in the app allowed to know a vendor exists** — `docs/analytics.md`. |
 | `lib/data/**` | Partner reads/writes (`queries.ts`, `actions.ts`), console reads/writes (`console-*.ts`), **your own account (`account-actions.ts`, either app)**, the `Result` type, the session and the role gates. |
@@ -233,6 +235,7 @@ Module detail lives in `docs/`, read on demand:
 | `docs/escalations.md` | §9.4, and why an open one holds an order's money |
 | `docs/analytics.md` | §14.6 — the one wrapper, the taxonomy, and what is deliberately not wired |
 | `docs/settings.md` | §13 — profile, team, the theme and its WCAG gate, notifications, and the Sign-in tab on both apps |
+| `docs/projects.md` | **The Projects tab** — mood boards, not the workspace; sharing, uploads, the PDF, and why `/p/` is exempt from the sign-in gate |
 | `docs/open-questions.md` | What is decided by default and needs a human to confirm |
 | `docs/landmines.md` | **Eighteen bugs already shipped or caught here**, kept because the shape of each recurs. Read before trusting a passing build. |
 | `supabase/test/README.md` | What the 189 assertions cover, the `blocked()` vs `unchanged()` distinction, and the two shim details that are load-bearing |

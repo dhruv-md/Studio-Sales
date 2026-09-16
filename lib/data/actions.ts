@@ -5,7 +5,7 @@ import { supabaseServer } from '@/lib/supabase/server'
 import { fail, ok, type Result } from './result'
 import { phone10 } from '@/lib/format'
 import type { CatalogPick } from '@/lib/catalog/types'
-import type { Referral } from '@/lib/domain/types'
+import type { Referral, StudioProject, StudioProjectSpace } from '@/lib/domain/types'
 
 /**
  * Every mutation. Two rules hold throughout:
@@ -987,4 +987,136 @@ export async function updateStudioProfile(input: {
     revalidatePath('/settings')
   }
   return r
+}
+
+// ------------------------------------------------------- studio projects
+
+/**
+ * The Projects tab — mood boards. A project can be tied to a referred client
+ * (autofilled from `referral`), an unreferred one (typed by hand), or
+ * neither. Never fetches the referral by anything but id — the same "never by
+ * name" rule as everywhere else a client is looked up.
+ */
+export async function createStudioProject(input: {
+  name: string
+  description?: string | null
+  project_type?: 'residential' | 'commercial' | 'other' | null
+  project_type_other?: string | null
+  city?: string | null
+  society?: string | null
+  cover_url?: string | null
+  referral_id?: string | null
+  client_name?: string | null
+  client_phone?: string | null
+}) {
+  if (!input.name?.trim()) return fail('Give the project a name.')
+  const pid = await partnerId()
+  if (!pid.ok) return pid
+
+  return insert<StudioProject>('studio_project', {
+    partner_id: pid.data,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    project_type: input.project_type || null,
+    project_type_other: input.project_type === 'other' ? input.project_type_other?.trim() || null : null,
+    city: input.city?.trim() || null,
+    society: input.society?.trim() || null,
+    cover_url: input.cover_url?.trim() || null,
+    referral_id: input.referral_id || null,
+    client_name: input.referral_id ? null : input.client_name?.trim() || null,
+    client_phone: input.referral_id ? null : input.client_phone?.trim() || null,
+  }, 'this project', '/projects')
+}
+
+export async function updateStudioProject(id: string, values: Row) {
+  return update('studio_project', id, { ...values, updated_at: new Date().toISOString() }, 'this project', `/projects/${id}`)
+}
+
+export async function deleteStudioProject(id: string) {
+  return remove('studio_project', id, 'this project', '/projects')
+}
+
+export async function createStudioSpace(projectId: string, name: string) {
+  if (!name?.trim()) return fail('Name this space.')
+  return insert<StudioProjectSpace>(
+    'studio_project_space', { project_id: projectId, name: name.trim() }, 'this space', `/projects/${projectId}`,
+  )
+}
+
+export async function renameStudioSpace(id: string, projectId: string, name: string) {
+  if (!name?.trim()) return fail('A space needs a name.')
+  return update('studio_project_space', id, { name: name.trim() }, 'this space', `/projects/${projectId}`)
+}
+
+export async function deleteStudioSpace(id: string, projectId: string) {
+  return remove('studio_project_space', id, 'this space', `/projects/${projectId}`)
+}
+
+/**
+ * Everything saved into a space goes through this one function — an uploaded
+ * image or video, a pasted Palette link, or a product reference link. `kind`
+ * and `source` are set by the caller rather than guessed from the URL, so a
+ * Palette link pasted as a "product link" is not silently reclassified.
+ */
+export async function addStudioItem(input: {
+  space_id: string
+  project_id: string
+  kind: 'image' | 'video' | 'palette_link' | 'product_link'
+  url: string
+  caption?: string | null
+  source?: 'upload' | 'palette' | 'manual'
+}) {
+  if (!input.url?.trim()) return fail('That needs a link.')
+  return insert('studio_project_item', {
+    space_id: input.space_id,
+    kind: input.kind,
+    url: input.url.trim(),
+    caption: input.caption?.trim() || null,
+    source: input.source ?? 'manual',
+  }, 'this item', `/projects/${input.project_id}`)
+}
+
+export async function deleteStudioItem(id: string, projectId: string) {
+  return remove('studio_project_item', id, 'this item', `/projects/${projectId}`)
+}
+
+function newShareToken() {
+  return crypto.randomUUID().replace(/-/g, '')
+}
+
+/** Idempotent — a project/space keeps the same link once shared, so a link
+ *  already handed to someone never quietly stops working. */
+export async function ensureProjectShareToken(id: string): Promise<Result<string>> {
+  const sb = await supabaseServer()
+  const { data: row, error: readErr } = await sb.from('studio_project').select('share_token').eq('id', id).maybeSingle()
+  if (readErr) return fail(`Could not load this project: ${readErr.message}`)
+  if (row?.share_token) return ok(row.share_token as string)
+  const token = newShareToken()
+  const { error } = await sb.from('studio_project').update({ share_token: token }).eq('id', id)
+  if (error) return fail(`Could not create a link: ${error.message}`)
+  return ok(token)
+}
+
+export async function ensureSpaceShareToken(id: string): Promise<Result<string>> {
+  const sb = await supabaseServer()
+  const { data: row, error: readErr } = await sb.from('studio_project_space').select('share_token').eq('id', id).maybeSingle()
+  if (readErr) return fail(`Could not load this space: ${readErr.message}`)
+  if (row?.share_token) return ok(row.share_token as string)
+  const token = newShareToken()
+  const { error } = await sb.from('studio_project_space').update({ share_token: token }).eq('id', id)
+  if (error) return fail(`Could not create a link: ${error.message}`)
+  return ok(token)
+}
+
+export async function saveStudioTemplate(input: { id?: string; name: string; accent_color?: string | null; intro_note?: string | null }) {
+  if (!input.name?.trim()) return fail('Name this style.')
+  const pid = await partnerId()
+  if (!pid.ok) return pid
+  const values = {
+    name: input.name.trim(),
+    accent_color: input.accent_color?.trim() || null,
+    intro_note: input.intro_note?.trim() || null,
+  }
+  if (input.id) return update('studio_project_template', input.id, values, 'this presentation style', '/projects')
+  return insert('studio_project_template', { ...values, partner_id: pid.data }, 'this presentation style', '/projects')
 }

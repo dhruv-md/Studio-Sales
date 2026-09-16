@@ -30,6 +30,12 @@ export default async function proxy(req: NextRequest) {
   const signedIn = Boolean(data.user)
   const path = req.nextUrl.pathname
 
+  // /p/<token> is the public, unauthenticated presentation page for a shared
+  // project or space (app/p/**) — the share token itself is the capability,
+  // read server-side with the service role. It must never require a session,
+  // the same way /login must not.
+  if (path.startsWith('/p/')) return res
+
   if (!signedIn && !path.startsWith('/login')) {
     const url = req.nextUrl.clone()
     url.pathname = '/login'

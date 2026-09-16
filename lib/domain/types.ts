@@ -595,3 +595,58 @@ export type PartnerActivity = {
   by_user: string | null
   created_at: string
 }
+
+// ------------------------------------------------------- studio projects
+//
+// The Projects tab — mood boards and inspiration spaces. 007_studio_v2.sql.
+// Deliberately separate from `Project`/`Client` above (the opt-in
+// design/quote/procurement workspace) — unrelated columns, unrelated purpose.
+
+export type StudioProject = {
+  id: string
+  partner_id: string
+  name: string
+  description: string | null
+  project_type: 'residential' | 'commercial' | 'other' | null
+  project_type_other: string | null
+  city: string | null
+  society: string | null
+  referral_id: string | null
+  client_name: string | null
+  client_phone: string | null
+  cover_url: string | null
+  share_token: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type StudioProjectSpace = {
+  id: string
+  project_id: string
+  name: string
+  sort_order: number
+  share_token: string | null
+  created_at: string
+}
+
+export type StudioItemKind = 'image' | 'video' | 'palette_link' | 'product_link'
+
+export type StudioProjectItem = {
+  id: string
+  space_id: string
+  kind: StudioItemKind
+  url: string
+  caption: string | null
+  source: 'upload' | 'palette' | 'manual'
+  sort_order: number
+  created_at: string
+}
+
+export type StudioProjectTemplate = {
+  id: string
+  partner_id: string
+  name: string
+  accent_color: string | null
+  intro_note: string | null
+  created_at: string
+}

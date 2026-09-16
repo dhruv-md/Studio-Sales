@@ -27,3 +27,14 @@ $$;
 
 grant usage on schema public to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+
+-- A faithful-enough stand-in for Supabase Storage's bucket registry — just
+-- enough that 007_studio_v2.sql's `insert into storage.buckets` runs. Nothing
+-- in this suite tests file upload itself (that goes through the service role
+-- from a route handler, not through RLS), so `storage.objects` is not shimmed.
+create schema if not exists storage;
+create table storage.buckets (
+  id text primary key,
+  name text not null,
+  public boolean not null default false
+);

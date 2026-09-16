@@ -769,6 +769,51 @@ async function asUser(c, uid, fn) {
   await c.query('delete from partner_team_invite where id = $1', [inviteId])
   await c.query('commit')
 
+  console.log('\n26. Projects — mood boards (007) — a firm’s own, staff see none of it')
+  let studioProjectId, studioSpaceId, studioItemId
+  await c.query('begin')
+  await c.query(`set local role authenticated`)
+  await c.query(`select set_config('request.jwt.claim.sub', $1, true)`, [DEMO_UID])
+  const sp = await c.query(
+    `insert into studio_project (partner_id, name) values ('0d0d0d0d-0000-4000-8000-000000000001','Test Mood Board') returning id`)
+  studioProjectId = sp.rows[0].id
+  const ss = await c.query(
+    `insert into studio_project_space (project_id, name) values ($1,'Living room') returning id`, [studioProjectId])
+  studioSpaceId = ss.rows[0].id
+  const si = await c.query(
+    `insert into studio_project_item (space_id, kind, url) values ($1,'image','https://example.com/x.jpg') returning id`,
+    [studioSpaceId])
+  studioItemId = si.rows[0].id
+  check('the demo firm can create a project, a space and an item', Boolean(studioProjectId && studioSpaceId && studioItemId))
+  await c.query('commit')
+
+  await asUser(c, DEMO_UID, async () => {
+    check('and reads all three back',
+      (await count('select count(*)::int n from studio_project where id = $1', [studioProjectId])) === 1 &&
+      (await count('select count(*)::int n from studio_project_space where id = $1', [studioSpaceId])) === 1 &&
+      (await count('select count(*)::int n from studio_project_item where id = $1', [studioItemId])) === 1)
+  })
+
+  await asUser(c, OTHER_UID, async () => {
+    check('another firm reads none of the project',
+      (await count('select count(*)::int n from studio_project where id = $1', [studioProjectId])) === 0)
+    check('nor the space', (await count('select count(*)::int n from studio_project_space where id = $1', [studioSpaceId])) === 0)
+    check('nor the item', (await count('select count(*)::int n from studio_project_item where id = $1', [studioItemId])) === 0)
+    await unchanged('and cannot add an item to somebody else’s space',
+      `insert into studio_project_item (space_id, kind, url) values ($1,'image','https://x')`, [studioSpaceId])
+  })
+
+  for (const [label, uid] of [['an admin', ADMIN_UID], ['a KAM', KAM_BLR_UID]]) {
+    await asUser(c, uid, async () => {
+      check(`${label} reads none of it either — this is the firm's own work, not the relationship`,
+        (await count('select count(*)::int n from studio_project where id = $1', [studioProjectId])) === 0)
+    })
+  }
+
+  await c.query('begin')
+  await c.query('delete from studio_project where id = $1', [studioProjectId])
+  await c.query('commit')
+
   console.log(`\n${pass} passed, ${fail} failed`)
   await c.end()
   process.exit(fail ? 1 : 0)
