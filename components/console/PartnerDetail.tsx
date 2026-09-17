@@ -12,8 +12,8 @@ import { CredentialsIssued } from './CredentialsIssued'
 import { CredentialPeek } from './CredentialPeek'
 import { OrderApprovalBadge } from '@/components/referrals/OrderApproval'
 import {
-  logActivity, provisionTeamInvite, readPartnerCredential, rejectTeamInvite, resetPartnerPassword,
-  updatePartnerAdminFields, type IssuedCredentials,
+  logActivity, provisionTeamInvite, readIssuedCredential, readPartnerCredential, rejectTeamInvite,
+  resetPartnerPassword, resetPartnerUserPassword, updatePartnerAdminFields, type IssuedCredentials,
 } from '@/lib/data/console-actions'
 import type { PartnerStanding } from '@/lib/domain/tiering'
 import { DORMANT_AFTER_DAYS } from '@/lib/domain/tiering'
@@ -431,12 +431,22 @@ const TEAM_INVITE_ROLE_LABEL: Record<PartnerTeamInvite['role'], string> = {
  * login` does, just against this firm's existing `partner_id` instead of a
  * new one. Reject needs a reason, same as declining a referral: a firm should
  * never read "declined" with nothing to act on.
+ *
+ * An approved request's name is tappable for the same reason a firm's own
+ * name is on its login card above: `provisionTeamInvite()` retains the
+ * password it issues (`006_credentials.sql`) just like every other login this
+ * console creates, so it should be findable the same way — `readIssuedCredential`
+ * and `resetPartnerUserPassword` are the same primitives `CredentialPeek`
+ * already uses for a firm's principal login, addressed by
+ * `provisioned_user_id` instead. A request has one only once it is approved;
+ * a rejected one never got a login to look up.
  */
 function TeamRequests({ invites, onError }: { invites: PartnerTeamInvite[]; onError: (e: string | null) => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [creds, setCreds] = useState<IssuedCredentials | null>(null)
   const [rejecting, setRejecting] = useState<PartnerTeamInvite | null>(null)
+  const [peeking, setPeeking] = useState<PartnerTeamInvite | null>(null)
   const [note, setNote] = useState('')
 
   const open = invites.filter((i) => i.status === 'requested')
@@ -489,15 +499,49 @@ function TeamRequests({ invites, onError }: { invites: PartnerTeamInvite[]; onEr
         <ul className="divide-y divide-line border-t border-line">
           {decided.map((inv) => (
             <li key={inv.id} className="flex items-center gap-2 px-4 py-2 text-xs text-ink-faint">
-              <span className="flex-1 truncate">{inv.name} · {TEAM_INVITE_ROLE_LABEL[inv.role]}</span>
+              {inv.status === 'approved' && inv.provisioned_user_id ? (
+                <button
+                  type="button"
+                  onClick={() => setPeeking(inv)}
+                  className="flex-1 truncate text-left hover:text-ink hover:underline"
+                >
+                  {inv.name} · {TEAM_INVITE_ROLE_LABEL[inv.role]}
+                </button>
+              ) : (
+                <span className="flex-1 truncate">{inv.name} · {TEAM_INVITE_ROLE_LABEL[inv.role]}</span>
+              )}
               <Badge tone={inv.status === 'approved' ? 'good' : 'bad'}>{inv.status}</Badge>
             </li>
           ))}
         </ul>
       ) : null}
 
-      <Modal open={creds !== null} onClose={() => setCreds(null)} title="Login created" hint={creds ? `For ${creds.firmName}` : undefined}>
+      <Modal open={creds !== null} onClose={() => setCreds(null)} title="Login" hint={creds ? `For ${creds.firmName}` : undefined}>
         {creds ? <CredentialsIssued creds={creds} onDone={() => setCreds(null)} /> : null}
+      </Modal>
+
+      <Modal
+        open={peeking !== null}
+        onClose={() => setPeeking(null)}
+        title={peeking ? `${peeking.name}’s login` : ''}
+        hint={peeking?.email}
+      >
+        {peeking?.provisioned_user_id ? (
+          <CredentialPeek
+            load={() => readIssuedCredential(peeking.provisioned_user_id as string)}
+            who={peeking.name}
+            resetting={pending}
+            onReset={() =>
+              start(async () => {
+                onError(null)
+                const res = await resetPartnerUserPassword(peeking.provisioned_user_id as string)
+                setPeeking(null)
+                if (!res.ok) return onError(res.error)
+                setCreds(res.data)
+              })
+            }
+          />
+        ) : null}
       </Modal>
 
       <Modal open={rejecting !== null} onClose={() => setRejecting(null)} title="Decline this request">

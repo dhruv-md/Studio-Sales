@@ -114,6 +114,21 @@ and to copy it now, rather than promising something the database did not do.
 where there is nothing to read back. Reach for them second: issuing a new
 password invalidates whatever the firm was already sent.
 
+**A teammate provisioned through a firm's own Team request is looked up the
+same way, not a separate one.** `provisionTeamInvite()` (`docs/settings.md`)
+retains the password it issues exactly like a firm's principal login does —
+same `rememberCredential()` call — so an approved request's name on the
+firm's **Team requests** panel (`components/console/PartnerDetail.tsx`) is
+tappable too, reading back through the same `readIssuedCredential()` and
+resetting through `resetPartnerUserPassword()`, addressed by
+`partner_team_invite.provisioned_user_id` rather than by firm — a firm can
+have more than one login now, and "reset the firm's password" meaning one
+specific teammate's would otherwise reset the wrong person's. Added
+2026-09-17, prompted by exactly this gap: the first version of that panel
+showed an approved request's status and nothing else, so a lost password had
+no repair short of the firm asking Material Depot by phone. A rejected
+request has no login and stays a plain, unclickable row.
+
 **Nothing is emailed from here, and that is a gap, not a design.** This
 deployment has no mail transport of its own. Pretending to send one would leave
 an admin believing a designer had been written to when nobody had, so the panel

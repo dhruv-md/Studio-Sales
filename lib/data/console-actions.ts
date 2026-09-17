@@ -756,6 +756,49 @@ export async function resetPartnerPassword(partnerId: string): Promise<Result<Is
 }
 
 /**
+ * A new password for one specific `partner_user` login, addressed by user id
+ * rather than by firm.
+ *
+ * `resetPartnerPassword` above always means the firm's PRINCIPAL login — the
+ * oldest `partner_user` row — because that was the only one a firm had until
+ * team invites existed. A teammate provisioned through `provisionTeamInvite()`
+ * is a second, later row on the same firm, so resetting "by firm" would reset
+ * the wrong person's password if what was meant was Meera Iyer's, not the
+ * firm's principal. Same generate/seal/retain primitive either way; only the
+ * lookup differs.
+ */
+export async function resetPartnerUserPassword(userId: string): Promise<Result<IssuedCredentials>> {
+  const staff = await requireStaff(['admin'])
+  if (!staff.ok) return staff
+
+  const svc = supabaseService()
+  const { data: link, error: linkErr } = await svc
+    .from('partner_user')
+    .select('user_id, partner:partner_id ( firm_name )')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (linkErr) return fail(`Could not find that login: ${linkErr.message}`)
+  if (!link) return fail('That login is not attached to any firm.')
+
+  const password = generatePassword()
+  const { data: updated, error } = await svc.auth.admin.updateUserById(userId, { password })
+  if (error) return fail(`Could not set a new password: ${error.message}`)
+
+  const firm = link.partner as unknown as { firm_name: string } | null
+  const email = updated?.user?.email ?? '(unknown address)'
+  const notRetained = await rememberCredential({
+    userId, kind: 'partner', email, password, issuedBy: staff.data.user_id,
+  })
+
+  return ok({
+    email,
+    password,
+    firmName: firm?.firm_name ?? 'this firm',
+    notRetained: notRetained ?? undefined,
+  })
+}
+
+/**
  * The same lookup, addressed by firm rather than by login.
  *
  * A firm's principal login is the oldest `partner_user` row — the one
