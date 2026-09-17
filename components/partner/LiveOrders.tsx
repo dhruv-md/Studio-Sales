@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import type { Referral } from '@/lib/domain/types'
 import { maturity, type LedgerOrder } from '@/lib/domain/ledger'
+import { explain, ORDER_NOT_COUNTED } from '@/lib/domain/reasons'
 import { Badge, Card, CardHead, Empty, Problem, Table, Td, Th, type Tone } from '@/components/ui'
 import { date, inr } from '@/lib/format'
 
@@ -37,7 +38,7 @@ export function LiveOrders({
 }) {
   const nameOf = new Map(referrals.map((r) => [r.id, r.client_name]))
   const live = orders
-    .filter((o) => maturity(o).state !== 'matured')
+    .filter((o) => !isRejected(o) && maturity(o).state !== 'matured')
     .sort((a, b) => (b.ordered_on ?? '').localeCompare(a.ordered_on ?? ''))
 
   return (
@@ -107,14 +108,32 @@ export function LiveOrders({
 
 /**
  * One order's status, in the order a partner actually needs to know it:
- * whether we have even checked it yet, then whether anything is blocking it,
- * then what Material Depot's own feed last called it. `approval_status` and
- * `maturity()` are structured facts this app already trusts; `order.status`
- * is a free-text string from a fourth system (`docs/referrals.md`) and is
- * shown as a caption underneath rather than driving the badge's colour —
- * this app has no fixed vocabulary for it to match against.
+ * whether an admin has declined it outright, then whether we have even
+ * checked it, then whether anything is blocking delivery, then what Material
+ * Depot's own feed last called it. `approval_status` and `maturity()` are
+ * structured facts this app already trusts; `order.status` is a free-text
+ * string from a fourth system (`docs/referrals.md`) and is shown as a
+ * caption underneath rather than driving the badge's colour — this app has
+ * no fixed vocabulary for it to match against.
+ *
+ * `rejected` is checked FIRST and returns early. A declined order (a
+ * duplicate sync, a wrong attribution) has `delivered_on` null forever — it
+ * is never coming back round to "delivered" — so falling through to
+ * `maturity()` for one, as an earlier version of this component did, renders
+ * "Awaiting a delivery date" against an order that is not awaiting anything.
+ * The reason comes from the same Appendix B codes the rewards ledger already
+ * uses (`lib/domain/reasons.ts`), not a new vocabulary.
  */
 export function OrderStatus({ order }: { order: LedgerOrder }) {
+  if (order.approval_status === 'rejected') {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <Badge tone="bad">Not counted</Badge>
+        <span className="text-[11px] text-ink-faint">{explain(ORDER_NOT_COUNTED, order.not_counted_reason)}</span>
+      </div>
+    )
+  }
+
   const m = maturity(order)
   const tone: Tone =
     order.approval_status === 'pending'
@@ -139,4 +158,10 @@ export function OrderStatus({ order }: { order: LedgerOrder }) {
       {order.status ? <span className="text-[11px] text-ink-faint">{order.status}</span> : null}
     </div>
   )
+}
+
+/** An order an admin has declined is settled, not "in flight" — it belongs
+ *  neither in the live-orders panel nor the delivered bucket. */
+export function isRejected(order: LedgerOrder) {
+  return order.approval_status === 'rejected'
 }

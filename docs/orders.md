@@ -17,6 +17,24 @@ both record that on production today `delivered_on` is null for every order —
 the CRM producer that fills it in does not exist yet. So "live orders" is
 honestly almost everything, not a bug in the filter.
 
+## A rejected order is not "awaiting delivery"
+
+`isRejected()` / the `approval_status === 'rejected'` branch in `OrderStatus`
+exists because the first version of this page did not have it: it fell
+through to `maturity()` for every order regardless of `approval_status`, and a
+declined duplicate — `delivered_on` null forever, since it is never actually
+being delivered under this attribution — rendered as "Awaiting a delivery
+date" next to Material Depot's own free-text status of "Cancelled". Found
+2026-09-17 signed in as a second demo firm (`demo.aranya@materialdepot.com`),
+whose seed data (`003_bulk_variety.sql`) has exactly this order on purpose.
+
+A rejected order now shows **Not counted**, with the same Appendix B reason a
+KAM sees on the approvals queue (`explain(ORDER_NOT_COUNTED, o.not_counted_reason)`,
+`lib/domain/reasons.ts`) — reused, not reworded. It is excluded from both the
+"In flight" and "Delivered" filters (it is neither) and still shows up under
+"All" — nothing about an order a partner referred disappears silently, the
+same rule `docs/referrals.md` states for rejection reason codes generally.
+
 ## `/orders` is not a seventh sidebar tab
 
 `components/shell/nav.ts` is deliberately six items. This page is a drill-down

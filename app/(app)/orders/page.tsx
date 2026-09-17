@@ -3,8 +3,8 @@ import { listEscalations, listReferralOrders, listReferrals } from '@/lib/data/q
 import { maturity, type LedgerOrder } from '@/lib/domain/ledger'
 import { todayIST } from '@/lib/domain/periods'
 import { PageHead } from '@/components/shell/PageHead'
-import { OrderStatus } from '@/components/partner/LiveOrders'
-import { Badge, Card, Empty, Problem, Table, Td, Th } from '@/components/ui'
+import { isRejected, OrderStatus } from '@/components/partner/LiveOrders'
+import { Card, Empty, Problem, Table, Td, Th } from '@/components/ui'
 import { date, inr } from '@/lib/format'
 
 /**
@@ -75,8 +75,14 @@ export default async function OrdersPage({
     .sort((a, b) => (b.ordered_on ?? '').localeCompare(a.ordered_on ?? ''))
 
   const view = filter === 'delivered' ? 'delivered' : filter === 'all' ? 'all' : 'live'
+  // A rejected order (an admin-declined duplicate, a wrong attribution) is
+  // settled, not "in flight" — `delivered_on` on one of these is never
+  // coming. It surfaces only under "All", with its reason, not silently
+  // dropped (`components/partner/LiveOrders.tsx`'s `OrderStatus`).
   const rows =
-    view === 'all' ? all : all.filter((o) => (maturity(o, today).state !== 'matured') === (view === 'live'))
+    view === 'all'
+      ? all
+      : all.filter((o) => !isRejected(o) && (maturity(o, today).state !== 'matured') === (view === 'live'))
 
   return (
     <>
