@@ -71,15 +71,11 @@ otherwise until probed live: `studio_project` and `staff_user.photo_url` both
 `200`, not `404`) — each verified by probing over PostgREST rather than by
 being told. All three seeds (`001_demo.sql`, `002_console.sql`,
 `003_bulk_variety.sql`) are applied and probed live as of 2026-09-17.
-**`008_phone_review.sql` is written, run through `supabase/test` (222/222),
-and NOT yet applied to the live project** — the harness's own permission
-gate refused running it there directly (a database write against real
-infrastructure, correctly treated as something a human pastes, not something
-run for them). Unlike 005, this one does NOT degrade gracefully if the app
-deploys first: `/api/sync/referrals` now filters `referral_phone` on a
-`status` column that would not exist yet, so every sync call 500s and no
-cart/order matches anything until the paste happens. **Paste 008 before
-this deploys — do not just paste it "soon."**
+**008 on 2026-09-17**, pasted by hand before the deploy that needed it landed
+— probed live over PostgREST: `referral_phone?select=status` returns `200`
+with every existing row (client-label and firm-added alike) grandfathered to
+`approved`, and `rpc/review_referral_phone` correctly refuses the service
+role with `only a Material Depot admin can approve a linked number`.
 `supabase/migrations/README.md` is the checklist and says which of the three
 Material Depot Supabase projects this one is.
 
