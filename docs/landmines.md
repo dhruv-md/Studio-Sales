@@ -1,6 +1,6 @@
 # Bugs already shipped here
 
-Twenty-one now. Kept because the **shape** of each one recurs, and because
+Twenty-two now. Kept because the **shape** of each one recurs, and because
 every one of them passed `tsc` and `next build` first.
 
 Add to this file when you fix a bug whose shape could come back. Date it, and
@@ -378,3 +378,31 @@ copying a guard trigger for a new table copies its bypass condition too, and
 that condition is the one part that has to be re-derived from who is
 actually supposed to write the column, not read off the table it was copied
 from.
+
+## 22. A rejected order rendered as "awaiting a delivery date"
+
+The first version of `OrderStatus` (`components/partner/LiveOrders.tsx`,
+2026-09-17) branched on `approval_status === 'pending'` and otherwise fell
+straight through to `maturity()`. `maturity()` has no notion of `rejected` —
+its only inputs are `delivered_on` and open escalations — so a declined
+duplicate order, whose `delivered_on` is null forever because it was never
+really being delivered under this attribution, came back `unknown` and
+rendered "Awaiting a delivery date" directly above Material Depot's own
+free-text status of "Cancelled".
+
+*From the user's side:* signed in as a second demo firm
+(`demo.aranya@materialdepot.com`, whose seed data in `003_bulk_variety.sql`
+carries exactly this case) rather than the one the feature was first checked
+against, an order that had been declined weeks earlier still read as
+in-flight and due any day.
+
+Fixed by checking `approval_status === 'rejected'` first and returning early
+with **Not counted** and the same Appendix B reason the approvals queue
+already renders (`explain(ORDER_NOT_COUNTED, o.not_counted_reason)`), rather
+than reasoning about it from delivery state at all. **The shape:** a status
+built from one field (delivery progress) silently mishandles a row whose
+real state lives in a different field (an admin's decision) that the first
+version never checked — and a feature verified against only the one demo
+firm it was designed around will not surface that, because that firm had no
+row in the state being missed. Checking a second account with different data
+found it in minutes.

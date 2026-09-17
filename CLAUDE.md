@@ -54,7 +54,7 @@ There is no lint command. The gate is `npm run typecheck`, `npm run build`,
 Postgres 18 and asserts **215** things about RLS. **Run all four before claiming
 a change works.**
 
-And then look at it. Every one of the twenty-one bugs in `docs/landmines.md` passed
+And then look at it. Every one of the twenty-two bugs in `docs/landmines.md` passed
 `tsc` and `build` — including a `useMemo` placed below an early return, which
 crashed a route the moment anybody clicked a row; most were found by signing in as the demo firm and walking
 the tabs, or by rendering a component against a fixture. `supabase/seed/001_demo.sql` exists so that is a two-minute
@@ -277,7 +277,7 @@ Module detail lives in `docs/`, read on demand:
 | `docs/projects.md` | **The Projects tab** — mood boards, not the workspace; sharing, uploads, the PDF, and why `/p/` is exempt from the sign-in gate |
 | `docs/kam-bridge.md` | The outbox that reflects a new referral/visit into the CRM's KAM tab — built here, nothing on the CRM side yet |
 | `docs/open-questions.md` | What is decided by default and needs a human to confirm |
-| `docs/landmines.md` | **Twenty-one bugs already shipped or caught here**, kept because the shape of each recurs. Read before trusting a passing build. |
+| `docs/landmines.md` | **Twenty-two bugs already shipped or caught here**, kept because the shape of each recurs. Read before trusting a passing build. |
 | `supabase/test/README.md` | What the 215 assertions cover, the `blocked()` vs `unchanged()` distinction, and the two shim details that are load-bearing |
 
 **When you change behaviour a doc describes, update that doc in the same
