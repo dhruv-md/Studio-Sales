@@ -252,7 +252,10 @@ throw it away. `supabase/test/rlstest.js` group 8 checks all nine by name.
 Only an `approved` order counts towards a partner's rewards, and
 `referral_order` has **no UPDATE policy for anybody**. The single thing that can
 change that column is `review_referral_order()`, which re-checks
-`app_is_admin()` inside Postgres. Same for publishing a portfolio piece.
+`app_is_admin()` inside Postgres. Same for publishing a portfolio piece, and
+since `008_phone_review.sql` the same for a `referral_phone` a firm links to a
+client — it does not count for cart/order matching until
+`review_referral_phone()` approves it.
 
 App-layer role checks (`requireStaff`) are there so the UI can be honest, not so
 the database can be trusted to a form field. A bug in one must not be enough to
