@@ -19,6 +19,7 @@ import { MetricCard } from '@/components/partner/MetricCard'
 import { RevenueTrend } from '@/components/partner/RevenueTrend'
 import { Funnel } from '@/components/partner/Funnel'
 import { NextBestAction, type Nudge } from '@/components/partner/NextBestAction'
+import { LiveOrders } from '@/components/partner/LiveOrders'
 import { OnboardingChecklist } from '@/components/shell/OnboardingChecklist'
 import { Badge, Button, Card, CardHead, Empty, Problem } from '@/components/ui'
 import { inr, inrShort } from '@/lib/format'
@@ -216,6 +217,10 @@ export default async function DashboardPage({
             tone="brand"
           />
         </div>
+
+        {isNew ? null : (
+          <LiveOrders orders={all} referrals={referrals.ok ? referrals.data : []} error={orders.ok ? null : orders.error} />
+        )}
 
         <div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
           <div className="space-y-5">

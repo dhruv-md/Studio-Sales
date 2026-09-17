@@ -137,6 +137,7 @@ skip that.
 | `app/api/sync/referrals` | Push endpoint for referral events and orders. Service-role, shared-secret. |
 | `app/api/sync/outbox`, `app/api/sync/visit-assignment` | The other direction — new referrals/visits out to the CRM, and a BM assignment back in. `docs/kam-bridge.md`. |
 | `app/api/upload` | The only door into the `studio-media` Storage bucket — checks the caller's session, then writes with the service role. |
+| `app/(app)/orders` | Order tracking across every referred client — not a nav item, reached from Overview's "Live orders" panel. `docs/orders.md`. |
 | `app/p/**` | Public, unauthenticated presentation pages for a shared Project or Space — `proxy.ts` exempts this path from the sign-in gate. |
 | `lib/domain/**` | The rules, and no I/O. Money, quantity, areas, markets, the internal tiering and the per-client rollup — plus the incentive programme: `slabs.ts` (the §10 ladders), `ledger.ts` (attribution, maturation, the statement), `periods.ts` (calendar months in string space), `programme.ts` (**every §17 default, in one file**), `privacy.ts` (§14.5), `reasons.ts` (Appendix B), `theme.ts` (§13.3 + the AA gate). |
 | `lib/analytics/**` | §14.6's single instrumentation layer. **The only place in the app allowed to know a vendor exists** — `docs/analytics.md`. |
@@ -268,6 +269,7 @@ Module detail lives in `docs/`, read on demand:
 | `docs/procurement.md` | The list, quantity-vs-row progress, status auto-advance |
 | `docs/finance.md` | Why the ledger is hand-entered and not derived from the quote |
 | `docs/referrals.md` | The three systems referral data lives in, the sync contract, and why cart state is derived |
+| `docs/orders.md` | The Overview "Live orders" panel and `/orders` — why "live" reuses `maturity()`, and why it is NOT a live feed from `procurement.materialdepot.com` (that host does not resolve) |
 | `docs/rewards.md` | **The §10 slab programme** — the two ladders, the formula, maturation, go-live, and why `reward_tier` is not the programme |
 | `docs/escalations.md` | §9.4, and why an open one holds an order's money |
 | `docs/analytics.md` | §14.6 — the one wrapper, the taxonomy, and what is deliberately not wired |
