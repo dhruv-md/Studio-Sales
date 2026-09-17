@@ -2,7 +2,7 @@ import { supabaseServer } from '@/lib/supabase/server'
 import { fail, ok, type Result } from './result'
 import type {
   OutreachProspect, OutreachTouch, Partner, PartnerActivity, PartnerApplication, PartnerTeamInvite,
-  PortfolioItem, Referral, ReferralEvent, ReferralOrder, RewardClaim, StaffUser,
+  PortfolioItem, Referral, ReferralEvent, ReferralOrder, ReferralPhone, RewardClaim, StaffUser,
 } from '@/lib/domain/types'
 
 /**
@@ -88,6 +88,27 @@ export const listAllOrders = (limit = 500) =>
         .order('ordered_on', { ascending: false, nullsFirst: false })
         .limit(limit),
     'referred orders',
+  )
+
+export type PhoneWithOwner = ReferralPhone & {
+  referral: (Pick<Referral, 'id' | 'client_name' | 'md_phone' | 'partner_id'> & {
+    partner: Pick<Partner, 'id' | 'firm_name' | 'market'> | null
+  }) | null
+}
+
+/** 008_phone_review.sql — every number a firm has ever linked to a client,
+ *  `pending` first. `client`-label rows never appear `pending` (they are
+ *  forced `approved` at insert), so this queue is only ever `partner`/
+ *  `additional` numbers a firm typed in themselves. */
+export const listAllPhones = (limit = 500) =>
+  many<PhoneWithOwner>(
+    (sb) =>
+      sb
+        .from('referral_phone')
+        .select('*, referral:referral_id ( id, client_name, md_phone, partner_id, partner:partner_id ( id, firm_name, market ) )')
+        .order('created_at', { ascending: false })
+        .limit(limit),
+    'linked numbers',
   )
 
 export const listOrdersFor = (referralIds: string[]) =>

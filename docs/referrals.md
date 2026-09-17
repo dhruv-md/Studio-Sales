@@ -299,10 +299,30 @@ linked to a referral, seeded with the original `md_phone` as a `'client'` row;
 ones it added, but never the original.
 
 `POST /api/sync/referrals`'s phone resolution reads both sources — a hit on
-`referral.md_phone` OR on any `referral_phone` row counts, deduplicated by
-referral id so a phone matching a referral on both is one match, not two. The
-`ambiguous` rule is unchanged: two DIFFERENT referrals both claiming a phone,
-across either source, is still reported and skipped rather than guessed.
+`referral.md_phone` OR on an **approved** `referral_phone` row counts,
+deduplicated by referral id so a phone matching a referral on both is one
+match, not two. The `ambiguous` rule is unchanged: two DIFFERENT referrals
+both claiming a phone, across either source, is still reported and skipped
+rather than guessed.
+
+### A firm-added number is approved before it counts (008_phone_review.sql)
+
+The same reasoning as the order gate below: a number is how money gets
+attributed, so a firm typing one in does not make it live immediately. Every
+`referral_phone` row a firm inserts (`'partner'` or `'additional'`) arrives
+`status = 'pending'` and is invisible to the sync's matching above until a
+Material Depot admin approves it in `/console/approvals`'s Numbers tab —
+`review_referral_phone()`, the same SECURITY DEFINER shape as
+`review_referral_order()` below, and `referral_phone` has no UPDATE policy for
+anybody either. The `'client'` row is the one exception: it is the number the
+referral itself was made on, already trusted, and a trigger forces it
+`approved` regardless of what arrives with it.
+
+`NumbersPanel` shows the state on the number itself — "Awaiting approval" or
+"Not approved" — rather than pretending every linked number already counts.
+Every row that existed before this migration was pasted, plus every `'client'`
+row from then on, is grandfathered/forced `approved`; the gate is for what a
+firm adds from here, not a retroactive freeze on numbers already relied on.
 
 ## Reason codes — PRD Appendix B
 
