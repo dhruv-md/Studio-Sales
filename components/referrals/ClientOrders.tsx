@@ -123,7 +123,7 @@ export function OrdersFooter({ orders, today, goLive }: { orders: LedgerOrder[];
       {noDelivery.length ? (
         <p>
           {noDelivery.length} order{noDelivery.length === 1 ? '' : 's'} {noDelivery.length === 1 ? 'is' : 'are'}{' '}
-          verified and waiting on a delivery date from us — the 30-day clock starts from delivery, so we cannot show you
+          verified and waiting on a delivery date from us — the 7-day clock starts from delivery, so we cannot show you
           a maturity date until we have one.
         </p>
       ) : null}

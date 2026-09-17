@@ -20,7 +20,7 @@ import { inr, inrShort } from '@/lib/format'
  * This module was a lifetime, cumulative six-rung ladder. The approved incentive
  * structure in §10 is not that: it is two parallel slab programmes on calendar
  * periods, with cashback as a rate on actual spend, a fixed gift per slab, a
- * 30-day maturation window and a provisional-then-confirmed ledger. The old
+ * 7-day maturation window and a provisional-then-confirmed ledger. The old
  * ladder is not a simplification of this one, it is a different promise, so it
  * has been replaced rather than dressed up. `reward_tier` and `reward_claim`
  * stay in the schema and in the console — they are the record of coins Material
@@ -139,8 +139,8 @@ export default async function RewardsPage({
           value={inrShort(confirmedCashback)}
           hint={
             yearGifts
-              ? `plus ${inrShort(yearGifts)} in gifts. Past the 30-day window and ready to settle.`
-              : 'Cashback past the 30-day window. Nothing has confirmed yet.'
+              ? `plus ${inrShort(yearGifts)} in gifts. Past the 7-day window and ready to settle.`
+              : 'Cashback past the 7-day window. Nothing has confirmed yet.'
           }
           tone="good"
         />

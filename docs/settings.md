@@ -1,9 +1,9 @@
 # About / Settings
 
-**Covers:** `app/(app)/settings · components/settings/** · lib/domain/theme.ts ·
-notification_pref` — PRD §13
+**Covers:** `app/(app)/settings · components/settings/** · lib/domain/theme.ts`
+— PRD §13
 
-Four tabs: Studio, Team & GST, Appearance, Notifications. Two of them are
+Four tabs: Studio, Team & GST, Appearance, Sign-in. Two of the first three are
 deliberately read-only and saying so on screen is the point rather than a
 shortcoming.
 
@@ -71,21 +71,15 @@ The theme is applied as a `style` attribute on the partner shell, not injected
 into `<head>`: no flash of the default palette, and it is scoped so the staff
 console can never pick up a firm's colours.
 
-## Notifications (§13.4)
+## Notifications (§13.4) — tab removed 2026-09-17
 
-Six event classes × three channels. Two rules:
-
-- **Transactional and legal notices are not on the list at all.** A greyed-out
-  row a partner cannot switch off is an invitation to try; absence is the honest
-  representation of something that is not a choice.
-- **A missing row means everything is on.** A firm that has never opened this
-  page should still be told its cashback was confirmed, so the default is
-  opt-out — `?? true` in the component, not a migration that writes a row per
-  firm.
-
-Nothing sends notifications yet. `docs/open-questions.md` has the standing note
-about there being no mail or WhatsApp transport on this deployment; these
-preferences are the contract the sender will read.
+The tab, its component (`NotificationPrefs`) and the read/write actions
+(`listNotificationPrefs`, `saveNotificationPrefs`) were deleted rather than
+left dead: nothing on this deployment sends a notification, and a settings
+screen for toggling channels that never fire read as the product promising
+something it was not doing. `notification_pref` stays in the schema — a
+future sender still has somewhere to read a preference from — but nothing in
+this app reads or writes it now.
 
 ## Sign-in (not in §13)
 

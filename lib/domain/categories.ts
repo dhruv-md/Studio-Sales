@@ -15,7 +15,7 @@ export const INTEREST_CATEGORIES = [
   'Wallpaper',
   'Wall panels',
   'Plywood',
-  'Cords',
+  'Quartz',
   'Bathroom accessories',
   'Hardware',
 ] as const

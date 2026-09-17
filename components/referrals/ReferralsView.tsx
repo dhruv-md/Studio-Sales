@@ -2,12 +2,12 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, CalendarPlus, Lock, Plus, Search, Trash2, UserPlus } from 'lucide-react'
+import { ArrowLeft, CalendarPlus, Plus, Search, Trash2, UserPlus } from 'lucide-react'
 import type {
   Escalation, EscalationComment, Referral, ReferralEvent, ReferralPhone, VisitRequest,
 } from '@/lib/domain/types'
 import {
-  Badge, Button, Card, CardHead, Empty, Input, Problem, Select, Table, Td, Th,
+  Button, Card, CardHead, Empty, Input, Problem, Select, Table, Td, Th,
 } from '@/components/ui'
 import { Modal } from '@/components/ui/Modal'
 import { ReferralFeed } from './ReferralFeed'
@@ -20,7 +20,6 @@ import { MaskedPhone } from './MaskedPhone'
 import { ClientOrders, OrdersFooter } from './ClientOrders'
 import { Escalations } from './Escalations'
 import { summariseClients } from '@/lib/domain/referrals'
-import { CONSENT_COPY, consentOf, itemisedVisible, valueBand } from '@/lib/domain/privacy'
 import { standing, type LedgerOrder } from '@/lib/domain/ledger'
 import { GO_LIVE } from '@/lib/domain/programme'
 import { deleteReferral } from '@/lib/data/actions'
@@ -65,7 +64,6 @@ export function ReferralsView({
   const [pending, start] = useTransition()
   // §9.1's filters, search and sort.
   const [query, setQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
   const [sort, setSort] = useState<'last_activity' | 'value' | 'referred'>('last_activity')
 
   const names = useMemo(() => new Map(referrals.map((r) => [r.id, r.client_name])), [referrals])
@@ -98,14 +96,13 @@ export function ReferralsView({
   }
 
 
-  // §9.1 — search by name or phone, filter by status, sort. Searching the phone
-  // works on the FULL number even though the list shows a masked one: an
-  // architect typing a number they already have is not a privacy event, and
-  // making them reveal first to find someone would be security theatre.
+  // §9.1 — search by name or phone, sort. Searching the phone works on the
+  // FULL number even though the list shows a masked one: an architect typing a
+  // number they already have is not a privacy event, and making them reveal
+  // first to find someone would be security theatre.
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
     let out = referrals.filter((r) => {
-      if (statusFilter && (r.status ?? 'submitted') !== statusFilter) return false
       if (!q) return true
       return r.client_name.toLowerCase().includes(q) || r.md_phone.includes(q.replace(/\D/g, ''))
     })
@@ -117,7 +114,7 @@ export function ReferralsView({
       return String(lb).localeCompare(String(la))
     })
     return out
-  }, [referrals, query, statusFilter, sort, stats])
+  }, [referrals, query, sort, stats])
 
   const open = referrals.find((r) => r.id === openId) ?? null
 
@@ -135,8 +132,6 @@ export function ReferralsView({
     const s = stats.get(open.id)
     const mine = s?.events ?? []
     const myOrders = (s?.orders ?? []) as LedgerOrder[]
-    const consent = consentOf(open)
-    const itemised = itemisedVisible(consent)
     const myEscalations = escalations.filter((e) => e.referral_id === open.id)
     const counted = myOrders.filter((o) => standing(o, today, GO_LIVE).state === 'counted')
     const countedValue = counted.reduce((sum, o) => sum + (Number(o.order_value) || 0), 0)
@@ -149,19 +144,6 @@ export function ReferralsView({
         >
           <ArrowLeft size={14} /> All clients
         </button>
-
-        {/* §14.5 — without confirmed consent a partner sees aggregate facts
-            only: visited yes/no, ordered yes/no, a value BAND. The banner says
-            which state this client is in rather than the page quietly showing
-            less than it did for the client above. */}
-        {!itemised ? (
-          <div className="mb-4 flex items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-raised px-4 py-3">
-            <Lock size={15} className="mt-0.5 shrink-0 text-ink-faint" />
-            <p className="text-xs leading-relaxed text-ink-soft">
-              <strong className="text-ink">{CONSENT_COPY[consent].label}.</strong> {CONSENT_COPY[consent].detail}
-            </p>
-          </div>
-        ) : null}
 
         <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
           <div className="space-y-5">
@@ -194,20 +176,12 @@ export function ReferralsView({
                   </div>
                 }
               />
-              {itemised ? (
-                <ReferralFeed
-                  events={mine}
-                  names={names}
-                  error={eventsError}
-                  emptyBody="Nothing has come through for them yet. Store visits, the products they looked at, their cart and any order will appear here."
-                />
-              ) : (
-                <AggregateOnly
-                  visited={mine.some((e) => e.event_type === 'store_visit')}
-                  orders={myOrders.length}
-                  band={valueBand(countedValue)}
-                />
-              )}
+              <ReferralFeed
+                events={mine}
+                names={names}
+                error={eventsError}
+                emptyBody="Nothing has come through for them yet. Store visits, the products they looked at, their cart and any order will appear here."
+              />
             </Card>
 
             <Card>
@@ -215,23 +189,11 @@ export function ReferralsView({
                 title="What they have bought"
                 hint="Every order, and what each one is doing for your rewards"
               />
-              {itemised ? (
-                <>
-                  <ClientOrders orders={myOrders} today={today} />
-                  <OrdersFooter orders={myOrders} today={today} goLive={GO_LIVE} />
-                </>
-              ) : (
-                <p className="px-4 py-4 text-sm text-ink-soft">
-                  {myOrders.length
-                    ? `${myOrders.length} order${myOrders.length === 1 ? '' : 's'} so far, ${countedValue ? `${valueBand(countedValue).toLowerCase()} of it counting towards your rewards` : 'none of it counting towards your rewards yet'}. We can show you the detail once this client confirms they are happy for us to.`
-                    : 'No orders yet.'}
-                </p>
-              )}
+              <ClientOrders orders={myOrders} today={today} />
+              <OrdersFooter orders={myOrders} today={today} goLive={GO_LIVE} />
               <div className="flex items-center justify-between border-t border-line px-4 py-2.5">
                 <span className="text-xs font-medium text-ink-soft">Counting towards your rewards</span>
-                <span className="tnum text-sm font-semibold text-good">
-                  {itemised ? inr(countedValue) : valueBand(countedValue)}
-                </span>
+                <span className="tnum text-sm font-semibold text-good">{inr(countedValue)}</span>
               </div>
             </Card>
 
@@ -265,15 +227,7 @@ export function ReferralsView({
 
             <Card>
               <CardHead title="In their cart" hint="The last cart we saw at a Material Depot store" />
-              {itemised ? (
-                <CartPanel cart={s?.cart ?? { state: 'none' }} />
-              ) : (
-                <p className="px-4 py-4 text-sm text-ink-soft">
-                  {s?.cart.state === 'open'
-                    ? 'They have something in a cart. We can show you what once they confirm they are happy for us to.'
-                    : 'Nothing in a cart that we can tell you about.'}
-                </p>
-              )}
+              <CartPanel cart={s?.cart ?? { state: 'none' }} />
             </Card>
 
             {open.project_type || open.budget_band || open.timeline || open.categories?.length ? (
@@ -348,20 +302,6 @@ export function ReferralsView({
                 />
               </div>
               <Select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value)
-                  track(EV.client_filter_applied, { kind: 'status', value: e.target.value || 'all' })
-                }}
-                className="h-8 w-auto text-xs"
-              >
-                <option value="">Any status</option>
-                <option value="submitted">Waiting on us</option>
-                <option value="approved">Approved</option>
-                <option value="active">Active</option>
-                <option value="rejected">Not accepted</option>
-              </Select>
-              <Select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as typeof sort)}
                 className="h-8 w-auto text-xs"
@@ -376,14 +316,13 @@ export function ReferralsView({
             </div>
 
             {rows.length === 0 ? (
-              <Empty title="Nothing matches" body="Try a different search, or clear the status filter." />
+              <Empty title="Nothing matches" body="Try a different search." />
             ) : (
               <Table>
                 <thead>
                   <tr>
                     <Th>Client</Th>
                     <Th>Phone</Th>
-                    <Th>Status</Th>
                     <Th>Referred</Th>
                     <Th>Last seen</Th>
                     <Th className="text-right">In cart</Th>
@@ -394,7 +333,6 @@ export function ReferralsView({
                 <tbody>
                   {rows.map((r) => {
                     const st = stats.get(r.id)
-                    const itemised = itemisedVisible(consentOf(r))
                     const counted = (st?.orders ?? []).filter(
                       (o) => standing(o as LedgerOrder, today, GO_LIVE).state === 'counted',
                     )
@@ -412,13 +350,12 @@ export function ReferralsView({
                         <Td className="text-xs" onClick={(e) => e.stopPropagation()}>
                           <MaskedPhone referralId={r.id} phone={r.md_phone} surface="client_list" />
                         </Td>
-                        <Td><ReferralStatusChip status={r.status} reason={r.rejection_reason} /></Td>
                         <Td className="text-xs text-ink-soft">{date(r.referred_on)}</Td>
                         <Td className="text-xs text-ink-soft">{st?.lastSeen ? relative(st.lastSeen) : '—'}</Td>
                         <Td className="tnum text-right text-xs">
                           {st?.cart.state === 'open' ? (
                             <span className="font-semibold text-brand">
-                              {itemised && st.cart.cart.value !== null ? inrShort(st.cart.cart.value) : 'open'}
+                              {st.cart.cart.value !== null ? inrShort(st.cart.cart.value) : 'open'}
                             </span>
                           ) : (
                             <span className="text-ink-faint">—</span>
@@ -427,7 +364,7 @@ export function ReferralsView({
                         <Td className="tnum text-right text-xs">{st?.orders.length ?? 0}</Td>
                         <Td className="tnum text-right text-xs font-semibold">
                           {countedValue ? (
-                            <span className="text-good">{itemised ? inrShort(countedValue) : valueBand(countedValue)}</span>
+                            <span className="text-good">{inrShort(countedValue)}</span>
                           ) : (
                             <span className="text-ink-faint">—</span>
                           )}
@@ -463,44 +400,3 @@ function Detail({ label, value }: { label: string; value: string }) {
   )
 }
 
-/**
- * §6.4's referral status machine, as a chip.
- *
- * `submitted` is the common state and it is labelled "Waiting on us", not
- * "Pending" — a partner reading "pending" assumes they have something left to
- * do. They do not; we do, within 48 hours.
- */
-function ReferralStatusChip({ status, reason }: { status?: string; reason?: string | null }) {
-  const s = status ?? 'submitted'
-  const map: Record<string, { label: string; tone: 'neutral' | 'good' | 'warn' | 'info' | 'bad' }> = {
-    submitted: { label: 'Waiting on us', tone: 'info' },
-    under_review: { label: 'Being checked', tone: 'info' },
-    approved: { label: 'Approved', tone: 'good' },
-    active: { label: 'Active', tone: 'good' },
-    rejected: { label: 'Not accepted', tone: 'bad' },
-    duplicate: { label: 'Already referred', tone: 'warn' },
-    dormant: { label: 'Gone quiet', tone: 'neutral' },
-    expired: { label: 'Expired', tone: 'neutral' },
-  }
-  const m = map[s] ?? { label: s, tone: 'neutral' as const }
-  return <span title={reason ?? undefined}><Badge tone={m.tone}>{m.label}</Badge></span>
-}
-
-/**
- * §14.5's "no consent → limited view": visited yes/no, ordered yes/no, an order
- * value band. No itemised carts, no timeline.
- *
- * Rendered as three plain facts rather than as a greyed-out version of the real
- * timeline. A blurred screen invites a partner to try to read through it; three
- * sentences make it clear that the detail is not being withheld from them
- * personally, it has not been agreed to yet.
- */
-function AggregateOnly({ visited, orders, band }: { visited: boolean; orders: number; band: string }) {
-  return (
-    <dl className="space-y-2 px-4 py-4 text-sm">
-      <Detail label="Been into a store" value={visited ? 'Yes' : 'Not yet'} />
-      <Detail label="Placed an order" value={orders ? `Yes · ${orders}` : 'Not yet'} />
-      <Detail label="Counting towards your rewards" value={band} />
-    </dl>
-  )
-}

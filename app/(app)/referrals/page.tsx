@@ -100,7 +100,7 @@ export default async function ReferralsPage({
                     accruing ? `${accruing} still maturing` : null,
                     pending.length ? `${pending.length} being checked` : null,
                   ].filter(Boolean).join(' · ')
-                : 'Verified and past the 30-day window'
+                : 'Verified and past the 7-day window'
             }
             tone="good"
           />

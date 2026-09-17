@@ -111,7 +111,7 @@ using the service-role key to write tables partners can only read.
     // 005_studio.sql. Everything below is what the incentive programme needs
     // and cannot compute without — PRD §10.4 calls the coupon pair a hard
     // Phase 1 dependency, not a Phase 2 nicety.
-    "delivered_on": "2026-09-20",     // the 30-day maturation counts from HERE
+    "delivered_on": "2026-09-20",     // the 7-day maturation counts from HERE
     "coupon_code": "MDPRO2",
     "discount_availed": 3690          // rupees ACTUALLY taken off at the till
   }]
@@ -156,7 +156,7 @@ reporting exists to prevent.
 `referral_order.approval_status` defaults to `pending`. A Material Depot admin
 verifies each one in `/console/approvals`, and only an `approved` order enters
 the incentive programme — `standing()` in `lib/domain/ledger.ts` is where that is
-decided, alongside the go-live cutoff and the 30-day maturation window.
+decided, alongside the go-live cutoff and the 7-day maturation window.
 `docs/rewards.md` has the whole chain.
 
 A decline now needs an Appendix B **reason code**; `review_referral_order()`
@@ -210,28 +210,23 @@ the existing claims first and reports only the difference. Verified against
 production on 2026-09-11: re-posting a seeded order returns `tiers_unlocked: []`
 and leaves the attributed total unchanged.
 
-## Consent, and what a partner is allowed to see — PRD §14.5
+## What a partner is allowed to see — PRD §14.5
 
 A partner sees an end customer's store visits, cart contents and order values.
 That is legitimate, it is somebody else's personal data, and India's DPDP Act
-applies. Three rules, all in `lib/domain/privacy.ts`:
+applies.
 
-**Consent has three states, not two.** `consent_given` is a NULLABLE boolean:
-null is "we have not asked", false is "they said no". Folding the first into the
-second throws away the only signal that would prompt anyone to ask — the same
-three-outcome rule as phone matching, one level up.
-
-Two separate columns, deliberately. `consent_claimed_at` is the partner ticking
-the box on the form. `consent_given` is Material Depot having confirmed it with
-the client directly, which §14.5 requires separately, and a trigger refuses a
-firm's own write to it. **A firm that could set it would be unlocking another
-person's purchase history by ticking a box about them.**
-
-**No consent → aggregate only.** Visited yes/no, ordered yes/no, an order value
-BAND. Not the timeline, not the cart, not the figure. Rendered as three plain
-facts rather than a blurred version of the real view: a blurred screen invites a
-partner to try to read through it, three sentences make clear the detail has not
-been agreed to rather than being withheld from them personally.
+**The consent gate is gone, on instruction.** §14.5 originally read "no
+confirmed consent → aggregate only": visited yes/no, ordered yes/no, an order
+value band, nothing itemised, until Material Depot had separately confirmed
+with the client that their activity could be shared. Removed 2026-09-17 —
+every order on this platform already carries the client's consent to be
+shared with the firm that referred them, so the gate had nothing left to
+withhold and just read as Material Depot stalling on a firm's own client. The
+client detail page now always shows the full timeline, cart and order
+figures. `consent_given` / `consent_claimed_at` stay on `referral` as
+historical columns — a trigger still refuses a firm's own write to
+`consent_given` — but nothing in the app reads either one any more.
 
 **Phone numbers are masked, and a reveal is logged.** `98XXXXXX10`, first two
 and last two. `revealPhone()` writes the `phone_reveal` row **and then** returns
@@ -252,7 +247,7 @@ just confused the two, so it is gone. Fields: client name, mobile number,
 city, EC expected to visit + date + time, project type (residential /
 commercial / something else, with a free-text describe), categories
 interested in (`lib/domain/categories.ts` — Tiles, Laminates, Wooden
-flooring, Wallpaper, Wall panels, Plywood, Cords, Bathroom accessories,
+flooring, Wallpaper, Wall panels, Plywood, Quartz, Bathroom accessories,
 Hardware), description of requirements, additional notes.
 
 The duplicate check still runs **before** submit, on blur of the phone field,

@@ -3,7 +3,7 @@ import { fail, ok, type Result } from './result'
 import type {
   Board, BoardItem, Client, FinanceEntry, ProcurementItem, Project, ProjectArea,
   Quote, QuoteLine, Referral, ReferralEvent, ReferralOrder, ReferralPhone, RewardClaim, RewardTier,
-  PortfolioItem, PartnerActivity, Escalation, EscalationComment, NotificationPref, VisitRequest,
+  PortfolioItem, PartnerActivity, Escalation, EscalationComment, VisitRequest,
   PartnerTeamInvite, StudioProject, StudioProjectItem, StudioProjectSpace, StudioProjectTemplate,
 } from '@/lib/domain/types'
 
@@ -227,6 +227,11 @@ export const listEscalations = () =>
     'your escalations',
   )
 
+/**
+ * There is deliberately no `.eq('internal', false)` or any other filter here —
+ * the hiding is a POLICY (`005_studio.sql`). A filter in a query is one
+ * forgotten call away from a leak, and the RLS suite checks the policy by name.
+ */
 export const listEscalationComments = (escalationIds: string[]) =>
   escalationIds.length
     ? many<EscalationComment>(
@@ -235,16 +240,3 @@ export const listEscalationComments = (escalationIds: string[]) =>
         'the replies on your escalations',
       )
     : Promise.resolve(ok<EscalationComment[]>([]))
-
-/**
- * Open escalations, counted per order.
- *
- * There is deliberately no `.eq('internal', false)` or any other filter here —
- * the hiding is a POLICY (`005_studio.sql`). A filter in a query is one
- * forgotten call away from a leak, and the RLS suite checks the policy by name.
- */
-export const listNotificationPrefs = () =>
-  one<NotificationPref>(
-    (sb) => sb.from('notification_pref').select('*').maybeSingle(),
-    'your notification settings',
-  )

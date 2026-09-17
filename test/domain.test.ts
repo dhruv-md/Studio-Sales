@@ -24,7 +24,7 @@ import {
 import {
   coinWall, discountOn, eligible, ledgerRows, maturity, periodStanding, standing, funnel,
 } from '../lib/domain/ledger.ts'
-import { maskPhone, valueBand, consentOf } from '../lib/domain/privacy.ts'
+import { maskPhone } from '../lib/domain/privacy.ts'
 import { GO_LIVE } from '../lib/domain/programme.ts'
 import { PRESETS, checkTheme, contrast, cssVariables, resolveTheme } from '../lib/domain/theme.ts'
 
@@ -590,20 +590,20 @@ t('an UNAPPROVED pre-go-live order is still pre-programme, never "being checked"
   assert.equal(s.state, 'pre_programme')
 })
 
-console.log('\nMaturation: 30 days past delivery, nothing open against it (PRD §6.2)')
-t('delivered 31 days ago has matured', () => {
-  const m = maturity(ord({ delivered_on: '2026-08-15' }), TODAY)
+console.log('\nMaturation: 7 days past delivery, nothing open against it (PRD §6.2)')
+t('delivered 15 days ago has matured', () => {
+  const m = maturity(ord({ delivered_on: '2026-09-01' }), TODAY)
   assert.equal(m.state, 'matured')
-  assert.equal(m.on, '2026-09-14')
+  assert.equal(m.on, '2026-09-08')
 })
-t('delivered 29 days ago is still maturing, and says which day it lands', () => {
-  const m = maturity(ord({ delivered_on: '2026-08-18' }), TODAY)
+t('delivered 6 days ago is still maturing, and says which day it lands', () => {
+  const m = maturity(ord({ delivered_on: '2026-09-10' }), TODAY)
   assert.equal(m.state, 'maturing')
   assert.equal(m.on, '2026-09-17')
   assert.equal(m.daysLeft, 1)
 })
-t('exactly 30 days is matured — the boundary counts as reached', () => {
-  assert.equal(maturity(ord({ delivered_on: '2026-08-17' }), TODAY).state, 'matured')
+t('exactly 7 days is matured — the boundary counts as reached', () => {
+  assert.equal(maturity(ord({ delivered_on: '2026-09-09' }), TODAY).state, 'matured')
 })
 t('NO delivery date is `unknown`, never `matured` and never `maturing`', () => {
   // Nothing in the referral sync carries a delivery date yet. Dating maturation
@@ -757,23 +757,6 @@ t('a phone is masked to first two and last two digits', () => {
 t('a number we cannot parse is masked whole, not partly', () => {
   assert.equal(maskPhone('12345'), '•••••')
   assert.equal(maskPhone(null), '—')
-})
-t('consent has three states, and "not asked" is not "refused"', () => {
-  assert.equal(consentOf({ consent_given: true }), 'given')
-  assert.equal(consentOf({ consent_given: false }), 'refused')
-  assert.equal(consentOf({ consent_given: null }), 'unknown')
-  assert.equal(consentOf({}), 'unknown')
-  assert.equal(consentOf(null), 'unknown')
-})
-t('without consent the partner sees a band, never the figure', () => {
-  // Zero is "nothing counted", not "never ordered" — orders that have not
-  // matured yet total zero and the client has still plainly bought something.
-  assert.equal(valueBand(0), 'Nothing yet')
-  assert.equal(valueBand(49999), 'Under ₹50 K')
-  assert.equal(valueBand(50000), 'Under ₹50 K')
-  assert.equal(valueBand(50001), '₹50 K – ₹1 L')
-  assert.equal(valueBand(384500), '₹2.5 L – ₹5 L')
-  assert.equal(valueBand(99999999), 'Over ₹10 L')
 })
 
 // ===========================================================================

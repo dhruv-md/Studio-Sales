@@ -290,7 +290,7 @@ function Breakdown({ standing, kind }: { standing: PeriodStanding; kind: 'month'
 
       {standing.maturingCount > 0 ? (
         <p className="mt-2 text-xs leading-relaxed text-ink-faint">
-          <strong className="text-ink-soft">Provisional.</strong> An order counts 30 days after it is delivered, so
+          <strong className="text-ink-soft">Provisional.</strong> An order counts 7 days after it is delivered, so
           nothing is settled while there is still time for a return. {standing.maturingCount} order
           {standing.maturingCount === 1 ? '' : 's'} in this {noun}
           {standing.maturingCount === 1 ? ' is' : ' are'} still inside that window.

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Check } from 'lucide-react'
 import type { Partner } from '@/lib/domain/types'
 import { Button, Card, CardHead, Field, Input, Problem, Select, Textarea } from '@/components/ui'
+import { Uploader } from '@/components/shell/Uploader'
 import { updateStudioProfile } from '@/lib/data/actions'
 import { EV, friction, track } from '@/lib/analytics/track'
 
@@ -32,6 +33,7 @@ export function ProfileForm({ partner }: { partner: Partner }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [logoUrl, setLogoUrl] = useState(partner.logo_url ?? '')
   const [pending, start] = useTransition()
 
   function submit(form: FormData) {
@@ -46,14 +48,13 @@ export function ProfileForm({ partner }: { partner: Partner }) {
         email: String(form.get('email') ?? ''),
         city: String(form.get('city') ?? ''),
         pincode: String(form.get('pincode') ?? ''),
-        operating_area: String(form.get('operating_area') ?? ''),
         registered_address: String(form.get('registered_address') ?? ''),
         office_address: String(form.get('office_address') ?? ''),
         pan: String(form.get('pan') ?? ''),
         website: String(form.get('website') ?? ''),
         instagram: String(form.get('instagram') ?? ''),
         linkedin: String(form.get('linkedin') ?? ''),
-        logo_url: String(form.get('logo_url') ?? ''),
+        logo_url: logoUrl,
         team_size: String(form.get('team_size') ?? ''),
         budget_range: String(form.get('budget_range') ?? ''),
         established_year: yearRaw ? Number(yearRaw) : null,
@@ -93,7 +94,7 @@ export function ProfileForm({ partner }: { partner: Partner }) {
           </Field>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field label="City"><Input name="city" defaultValue={partner.city ?? ''} /></Field>
           {/* §2.5: captured now so automatic KAM assignment later is config. */}
           <Field
@@ -101,9 +102,6 @@ export function ProfileForm({ partner }: { partner: Partner }) {
             hint="Six digits. It is how we will match you to the right key account manager."
           >
             <Input name="pincode" inputMode="numeric" defaultValue={partner.pincode ?? ''} placeholder="560001" />
-          </Field>
-          <Field label="Where you mostly work" hint="The part of town your sites are in.">
-            <Input name="operating_area" defaultValue={partner.operating_area ?? ''} />
           </Field>
         </div>
 
@@ -151,8 +149,14 @@ export function ProfileForm({ partner }: { partner: Partner }) {
           <Field label="Website"><Input name="website" defaultValue={partner.website ?? ''} placeholder="https://" /></Field>
           <Field label="Instagram"><Input name="instagram" defaultValue={partner.instagram ?? ''} placeholder="@studio" /></Field>
           <Field label="LinkedIn"><Input name="linkedin" defaultValue={partner.linkedin ?? ''} /></Field>
-          <Field label="Logo URL" hint="We cannot take uploads yet — a link to your logo works.">
-            <Input name="logo_url" defaultValue={partner.logo_url ?? ''} placeholder="https://" />
+          <Field label="Logo" hint="Shows in your sidebar here, and beside your work on materialdepot.com.">
+            <div className="flex items-center gap-3">
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt="" className="size-10 rounded-md border border-line object-contain bg-surface" />
+              ) : null}
+              <Uploader accept="image/*" label={logoUrl ? 'Change logo' : 'Upload logo'} onUploaded={setLogoUrl} onError={setError} />
+            </div>
           </Field>
         </div>
 

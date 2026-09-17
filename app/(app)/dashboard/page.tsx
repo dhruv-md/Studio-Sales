@@ -295,21 +295,7 @@ export default async function DashboardPage({
               </ul>
             )}
           </Card>
-        ) : (
-          <Card>
-            <div className="px-4 py-4">
-              <h2 className="font-display text-[15px] font-semibold tracking-tight text-ink">
-                There is more here if you want it
-              </h2>
-              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ink-soft">
-                Design boards, client quotes with your own markup, a procurement list and a project P&amp;L are
-                all built and switched off for your account. They are yours to turn on whenever you want them,
-                and nobody at Material Depot can see what you put in them — not your clients, not your rates,
-                not your margins. Ask your key account manager and we will enable it.
-              </p>
-            </div>
-          </Card>
-        )}
+        ) : null}
       </div>
     </>
   )

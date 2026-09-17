@@ -750,10 +750,11 @@ export async function raiseEscalation(input: {
   description: string
   referral_id?: string | null
   order_id?: string | null
+  attachments?: string[]
 }) {
   const pid = await partnerId()
   if (!pid.ok) return pid
-  if (!input.subject?.trim()) return fail('Give the escalation a one-line subject.')
+  if (!input.subject?.trim()) return fail('Give the escalation a title.')
   if (!input.description?.trim()) return fail('Tell us what happened — the detail is what the store team acts on.')
 
   const r = await insert('escalation', {
@@ -763,6 +764,7 @@ export async function raiseEscalation(input: {
     description: input.description.trim(),
     referral_id: input.referral_id || null,
     order_id: input.order_id || null,
+    attachments: input.attachments?.length ? input.attachments : [],
   }, 'this escalation', '/referrals')
   if (r.ok) revalidatePath('/dashboard')
   return r
@@ -787,20 +789,6 @@ export async function reopenEscalation(id: string, why: string) {
   const { error } = await sb.rpc('reopen_escalation', { p_id: id, p_why: why.trim() })
   if (error) return fail(`Could not reopen that escalation: ${error.message}`)
   revalidatePath('/referrals')
-  return ok(true as const)
-}
-
-/** §13.4. Upsert, because a firm that has never opened Settings has no row and
- *  a missing row reads as "everything on". */
-export async function saveNotificationPrefs(prefs: Record<string, { in_app?: boolean; email?: boolean; whatsapp?: boolean }>) {
-  const pid = await partnerId()
-  if (!pid.ok) return pid
-  const sb = await supabaseServer()
-  const { error } = await sb
-    .from('notification_pref')
-    .upsert({ partner_id: pid.data, prefs, updated_at: new Date().toISOString() }, { onConflict: 'partner_id' })
-  if (error) return fail(`Could not save your notification settings: ${error.message}`)
-  revalidatePath('/settings')
   return ok(true as const)
 }
 

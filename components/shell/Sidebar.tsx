@@ -33,12 +33,18 @@ export function Sidebar({
   footerTitle,
   footerSub,
   tone = 'brand',
+  logoUrl,
 }: {
   nav: NavSpec
   eyebrow: string
   footerTitle: string
   footerSub: string | null
   tone?: 'brand' | 'ink'
+  /** A partner's own logo (`partner.logo_url`). When set, this becomes the
+   *  prominent mark and the Material Depot wordmark shrinks to a corner
+   *  badge on it — on instruction, so the app reads as the firm's own rather
+   *  than as a Material Depot product they are a tenant in. */
+  logoUrl?: string | null
 }) {
   const path = usePathname()
   const router = useRouter()
@@ -57,17 +63,29 @@ export function Sidebar({
   return (
     <aside className="flex w-full shrink-0 flex-col border-line bg-surface md:h-dvh md:w-60 md:border-r">
       <div className="border-b border-line px-4 py-4">
-        <p className="font-display text-[15px] leading-tight font-semibold tracking-tight text-ink">
-          Material Depot
-        </p>
-        <p
-          className={cn(
-            'text-[11px] font-medium tracking-wide uppercase',
-            tone === 'ink' ? 'text-ink-soft' : 'text-brand',
-          )}
-        >
-          {eyebrow}
-        </p>
+        {logoUrl ? (
+          <div className="relative inline-block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoUrl} alt={footerTitle} className="h-10 max-w-[168px] object-contain object-left" />
+            <p className="mt-1 text-right text-[9px] leading-tight font-medium tracking-wide text-ink-faint uppercase">
+              Material Depot <span className={tone === 'ink' ? 'text-ink-faint' : 'text-brand'}>{eyebrow}</span>
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="font-display text-[15px] leading-tight font-semibold tracking-tight text-ink">
+              Material Depot
+            </p>
+            <p
+              className={cn(
+                'text-[11px] font-medium tracking-wide uppercase',
+                tone === 'ink' ? 'text-ink-soft' : 'text-brand',
+              )}
+            >
+              {eyebrow}
+            </p>
+          </>
+        )}
       </div>
 
       <nav className="flex gap-1 overflow-x-auto p-2 md:flex-1 md:flex-col md:overflow-visible">

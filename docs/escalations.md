@@ -32,12 +32,13 @@ author an "internal" note even if a form lies about the flag.
 
 `supabase/test/rlstest.js` group 16 checks both directions by name.
 
-## What is NOT built
+## What is built, and what is not
 
-**Attachments.** §9.4 specifies images and PDFs up to 10MB, max 5. The
-`attachments text[]` column exists; nothing in this app uploads to Supabase
-Storage yet. The form says to send files to the KAM rather than showing a file
-picker that silently drops what was selected.
+**One image attachment, built 2026-09-17.** The raise form has a single
+optional image field through `app/api/upload/route.ts` into `studio-media`,
+written into the `attachments text[]` column. §9.4's fuller spec — PDFs too,
+up to 5 files at 10MB each — is not built; a partner with more to show still
+sends the rest to their key account manager.
 
 **The staff side.** `set_escalation_status()` exists, is tested, and refuses a
 partner and an out-of-market KAM. No console screen calls it yet — today a KAM

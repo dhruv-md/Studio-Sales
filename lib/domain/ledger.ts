@@ -9,7 +9,7 @@
  *
  *   approved by an admin   →   on or after go-live   →   assigned to a period
  *        (§6.3.4)                   (§15)                     (§10.4)
- *        →   30 days past delivery with no open escalation   →   counted
+ *        →   7 days past delivery with no open escalation      →   counted
  *                            (§6.2, §10.4)
  *
  * A figure is PROVISIONAL until every order in its period has matured (§10.4's
@@ -57,9 +57,9 @@ export type LedgerOrder = ReferralOrder & {
 // ------------------------------------------------------------ one order
 
 export type Maturity =
-  /** past delivery + 30 days, nothing open against it */
+  /** past delivery + 7 days, nothing open against it */
   | { state: 'matured'; on: string; daysLeft: 0 }
-  /** delivered, still inside the 30 days */
+  /** delivered, still inside the 7 days */
   | { state: 'maturing'; on: string; daysLeft: number }
   /** an escalation is open — §10.5 blocks maturation until it closes */
   | { state: 'held'; on: string | null; daysLeft: number | null }

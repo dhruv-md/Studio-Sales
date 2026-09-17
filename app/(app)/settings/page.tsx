@@ -1,10 +1,9 @@
 import Link from 'next/link'
 import { UsersRound } from 'lucide-react'
 import { currentSession, myKam } from '@/lib/data/session'
-import { listNotificationPrefs, listTeamInvites } from '@/lib/data/queries'
+import { listTeamInvites } from '@/lib/data/queries'
 import { ProfileForm } from '@/components/settings/ProfileForm'
 import { ThemePicker } from '@/components/settings/ThemePicker'
-import { NotificationPrefs } from '@/components/settings/NotificationPrefs'
 import { TeamInvites } from '@/components/settings/TeamInvites'
 import { ChangePassword } from '@/components/account/ChangePassword'
 import { KamCard } from '@/components/partner/KamCard'
@@ -15,11 +14,14 @@ import type { PartnerTeamInvite } from '@/lib/domain/types'
 /**
  * About / Settings — PRD §13.
  *
- * Five sections, in the §7 information architecture's order: company profile,
- * team and GSTINs, theme, notifications, KAM contact.
+ * Four sections, in the §7 information architecture's order: company profile,
+ * team and GSTINs, theme, KAM contact. §13.4's notifications tab was removed
+ * on instruction, 2026-09-17 — nothing on this deployment sends a
+ * notification yet, and a settings screen for toggling channels nobody uses
+ * read as a promise the product was not keeping — `docs/open-questions.md`.
  *
- * Two of them are deliberately read-only, and saying so on screen is the point
- * rather than a shortcoming:
+ * Two of the remaining sections are deliberately read-only, and saying so on
+ * screen is the point rather than a shortcoming:
  *
  * - **Team** (§13.2). "The Owner raises a request to add a user or change a
  *   designation; Admin approves and provisions." `partner_user` has no insert
@@ -40,7 +42,6 @@ const TABS = [
   { key: 'profile', label: 'Studio' },
   { key: 'team', label: 'Team & GST' },
   { key: 'theme', label: 'Appearance' },
-  { key: 'notifications', label: 'Notifications' },
   { key: 'signin', label: 'Sign-in' },
 ] as const
 
@@ -54,8 +55,8 @@ export default async function SettingsPage({
   const { tab } = await searchParams
   const active: TabKey = (TABS.find((t) => t.key === tab)?.key ?? 'profile') as TabKey
 
-  const [session, kam, prefs, invites] = await Promise.all([
-    currentSession(), myKam(), listNotificationPrefs(), listTeamInvites(),
+  const [session, kam, invites] = await Promise.all([
+    currentSession(), myKam(), listTeamInvites(),
   ])
 
   if (!session.ok) {
@@ -81,13 +82,6 @@ export default async function SettingsPage({
         <div className="space-y-5">
           {active === 'profile' ? <ProfileForm partner={partner} /> : null}
           {active === 'theme' ? <ThemePicker partner={partner} /> : null}
-          {active === 'notifications' ? (
-            prefs.ok ? (
-              <NotificationPrefs pref={prefs.data} />
-            ) : (
-              <Problem title="We could not load your notification settings" detail={prefs.error} />
-            )
-          ) : null}
           {active === 'team' ? (
             <Team
               partner={partner}
@@ -103,27 +97,6 @@ export default async function SettingsPage({
 
         <div className="space-y-5">
           <KamCard kam={kam.ok ? kam.data : null} error={kam.ok ? null : kam.error} />
-          <Card>
-            <CardHead title="How we use what you put here" hint="Plain version" />
-            <div className="space-y-2.5 px-4 py-3 text-xs leading-relaxed text-ink-soft">
-              <p>
-                Your studio profile and your published work go on materialdepot.com. Nothing else here does.
-              </p>
-              <p>
-                Material Depot staff can see your firm, the clients you referred us, and what those clients bought from
-                us. They cannot see your own client list, your projects, your quotes or your margins — there is no
-                policy anywhere in this system that would let them.
-              </p>
-              <p>
-                Reference images you upload to a project inform what we stock, aggregated and anonymised. We never show
-                one firm&rsquo;s references to another.{' '}
-                <Link href="/rewards?tab=terms" className="text-brand hover:underline">
-                  The programme terms
-                </Link>{' '}
-                cover the rest.
-              </p>
-            </div>
-          </Card>
         </div>
       </div>
     </Shell>

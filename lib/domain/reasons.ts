@@ -29,7 +29,7 @@ export const ORDER_NOT_COUNTED = {
   EXCLUDED_CATEGORY: 'This category is outside the incentive programme.',
   SELF_PURCHASE_EXCLUDED: 'Bought on your own firm’s GST, and excluded by an admin.',
   ORDER_CANCELLED: 'The order was cancelled.',
-  NOT_MATURED: 'Not yet 30 days past delivery. It will count once it matures.',
+  NOT_MATURED: 'Not yet 7 days past delivery. It will count once it matures.',
   OPEN_ESCALATION: 'There is an open escalation against this order. It matures once that is closed.',
   DUPLICATE_ORDER: 'The same order reached us twice; only one copy counts.',
   PRICING_EXCEPTION: 'Priced outside the standard structure. Your key account manager has the detail.',

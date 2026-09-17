@@ -358,7 +358,7 @@ export type ReferralOrder = {
   /** rupees actually taken off. **null means UNKNOWN, never zero** — see
    *  `discountOn()` in lib/domain/ledger.ts. */
   discount_availed?: number | null
-  /** maturation counts 30 days from HERE, not from `ordered_on` */
+  /** maturation counts 7 days from HERE, not from `ordered_on` */
   delivered_on?: string | null
   not_counted_reason?: string | null
   /** placed on the partner firm's own GSTIN (§6.3.6) */
@@ -407,8 +407,9 @@ export type MyKam = {
   phone: string | null
   email: string | null
   market: string | null
-  /** Link, not upload — same pattern as `partner.logo_url`. Null is common;
-   *  the card falls back to an initials/icon avatar rather than a broken image. */
+  /** A KAM's own staff-set photo, link only — there is no upload path for
+   *  this one. Null is common; the card falls back to an initials/icon
+   *  avatar rather than a broken image. */
   photo_url: string | null
 }
 

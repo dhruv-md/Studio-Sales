@@ -56,7 +56,7 @@ send it instead of summing them as nothing. When any order in a period is
 missing it, the **net figure is withheld** and the screen says why. Treating
 those as ₹0 would overstate every partner's net cashback on the platform.
 
-**Maturation is 30 days from DELIVERY.** Not from the order. `delivered_on` null
+**Maturation is 7 days from DELIVERY.** Not from the order. Changed from 30 days on instruction, 2026-09-17. `delivered_on` null
 means `unknown`, and `maturity()` says so rather than counting from `ordered_on`
 — which would pay a month early. An open escalation against an order holds it in
 `held` however old the delivery is.

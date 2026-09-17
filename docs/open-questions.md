@@ -17,7 +17,7 @@ enough that changing it is expensive.
 | 9 | Can a partner add colleagues? | Not self-serve. `partner_user` has no insert policy; `onboard_partner()` refuses a second firm on the same phone and says to ask Material Depot. |
 | 10 | Wastage default | 0%, set per item. A silent default of 5–10% would inflate quotes in a way nobody asked for. |
 | 11 | Do partners get the project workspace on day one? | **No.** `partner.workspace_enabled` defaults to false and an admin turns it on per firm. The brief was explicit that designers are wary of moving their workflow into a supplier's portal, and a nav full of modules nobody asked for is what makes that worse. Nothing is deleted — `docs/roles.md`. |
-| 12 | Does a referred order count as soon as it syncs? | **No.** It arrives `pending`, an admin verifies it, and then it still has to be 30 days past delivery with no open escalation — `standing()` in `lib/domain/ledger.ts`. |
+| 12 | Does a referred order count as soon as it syncs? | **No.** It arrives `pending`, an admin verifies it, and then it still has to be 7 days past delivery with no open escalation — `standing()` in `lib/domain/ledger.ts`. |
 | 13 | Who verifies an order — anyone on the B2B team, or only an admin? | Only an admin, enforced inside Postgres by `review_referral_order()`. A KAM verifying their own firms' orders is the one person with a reason not to look hard. |
 | 14 | How are credentials delivered? | Generated on approval and **shown once** to the admin, who sends them. There is no mail transport on this deployment; `auth.admin.inviteUserByEmail()` is the swap once Supabase SMTP is configured — `docs/onboarding.md`. |
 | 15 | How long before a firm "needs reactivating"? | 90 days with no verified order — `DORMANT_AFTER_DAYS`. The brief said three months. "Never ordered" is kept as a separate third state, not folded into dormant. |
@@ -49,7 +49,7 @@ invented rate will plan against it.
 | 11 | Attribution window length | Head of B2B | 365 days (`ATTRIBUTION_WINDOW_DAYS`), and `referral.attribution_expires_on` is nullable — a referral approved before this is settled gets an open-ended window rather than a silently closed one. |
 | 12 | Split credit between two partners | Head of B2B | **Not supported** (`SPLIT_CREDIT = false`), matching the PRD. The sync already reports a two-firm phone match as `ambiguous` rather than guessing. |
 | 13 | Pre-existing customers claimed at cutover | Head of B2B + Legal | Reason code `EXISTING_CUSTOMER` exists and an admin decides per referral. No automatic rule. |
-| 14 | End-client consent mechanism and copy | Legal | Built as a hard gate with our own wording — `docs/referrals.md`. The copy is the part Legal will want to rewrite; it is in one component. |
+| 14 | End-client consent mechanism and copy | Legal | **Decided, 2026-09-17: no gate.** Every order already carries the client's consent to be shared with the referring firm, so the aggregate-only view and its copy were removed rather than rewritten — `docs/referrals.md`. |
 | 15 | Are partner cart additions suggestions or direct writes? | Head of B2B | **Suggestions** (`CART_ADDITIONS_ARE`), the PRD's recommendation. Not built yet either way. |
 | 16 | Palette SKU-mapping coverage | Palette team | Out of scope here. |
 | 17 | Portfolio editorial standards | Marketing | Appendix B's portfolio codes are wired into the console's reject flow. |
@@ -86,10 +86,13 @@ invented rate will plan against it.
   and the review state. Whatever builds the partners page on materialdepot.com
   reads `portfolio_item where status = 'published'`; that consumer does not exist
   yet — `docs/portfolio.md`.
-- **Nothing sends a notification.** §13.4's preferences are stored and honoured
-  by nobody, because there is no mail or WhatsApp transport on this deployment.
-  The preferences are the contract the eventual sender reads; the UI does not
-  pretend otherwise.
+- **Nothing sends a notification, and the settings tab for it is gone.**
+  §13.4's preferences would have been stored and honoured by nobody, because
+  there is no mail or WhatsApp transport on this deployment — so on
+  instruction, 2026-09-17, the Notifications tab and its read/write code were
+  removed rather than left as a promise the product was not keeping.
+  `notification_pref` stays in the schema for whenever a sender exists —
+  `docs/settings.md`.
 - **The staff side of escalations is one screen short.**
   `set_escalation_status()` exists, is tested, and refuses a partner and an
   out-of-market KAM. No console page calls it — today a KAM moves a ticket from

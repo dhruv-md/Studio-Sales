@@ -117,7 +117,7 @@ export function RewardLedger({ rows }: { rows: LedgerRow[] }) {
       <div className="space-y-1 border-t border-line px-4 py-2.5 text-[11px] leading-relaxed text-ink-faint">
         <p>
           <strong className="text-ink-soft">Provisional</strong> means the slab is set but the order has not matured —
-          it counts 30 days after delivery, so a return has time to land first.{' '}
+          it counts 7 days after delivery, so a return has time to land first.{' '}
           <strong className="text-ink-soft">Confirmed</strong> means it has, and it is ready for settlement.
         </p>
         <p>
@@ -153,7 +153,7 @@ function StatusChip({ row }: { row: LedgerRow }) {
 
 /**
  * §10.5.6 — "Plain-language explanation of what counts, what doesn't, the
- * 30-day maturation rule, the coupon deduction, the approval process, reversal
+ * 7-day maturation rule, the coupon deduction, the approval process, reversal
  * policy, tax treatment, and the dispute route. Versioned — partners see the
  * version applicable to their accrual period."
  *
@@ -180,8 +180,8 @@ export function ProgrammeTerms({ goLive, version }: { goLive: string; version: s
           real and you will see it in your client timelines, labelled <em>Pre-programme</em>, carrying no reward value.
           We would rather tell you that now than in an argument at the end of a good month.
         </Term>
-        <Term title="The 30-day rule">
-          An order counts 30 days after it is delivered. That window exists so a return or a damaged delivery is
+        <Term title="The 7-day rule">
+          An order counts 7 days after it is delivered. That window exists so a return or a damaged delivery is
           settled before anyone is paid on it. While an order is inside the window your month shows as{' '}
           <em>provisional</em>; when every order in a month has cleared it, the month is <em>confirmed</em>. If you
           raise an escalation against an order, that order stays provisional until the escalation is closed.

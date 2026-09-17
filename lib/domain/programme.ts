@@ -27,9 +27,10 @@
  */
 export const GO_LIVE = '2026-07-01'
 
-/** §6.2 / §10.4 — an order is reward-eligible 30 days after DELIVERY, provided
- *  no escalation against it is open. */
-export const MATURATION_DAYS = 30
+/** §6.2 / §10.4 — an order is reward-eligible 7 days after DELIVERY, provided
+ *  no escalation against it is open. Changed from 30 to 7 on instruction,
+ *  2026-09-17 — `docs/rewards.md`. */
+export const MATURATION_DAYS = 7
 
 /**
  * §17 decision 3 — period assignment basis. **ASSUMED: order date.**

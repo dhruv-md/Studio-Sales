@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, MessageSquare, Plus } from 'lucide-react'
+import { AlertCircle, MessageSquare, Plus, X } from 'lucide-react'
 import type { Escalation, EscalationComment, ReferralOrder } from '@/lib/domain/types'
 import { Badge, Button, Card, CardHead, Empty, Field, Input, Problem, Select, Textarea, type Tone } from '@/components/ui'
 import { Modal } from '@/components/ui/Modal'
+import { Uploader } from '@/components/shell/Uploader'
 import { commentOnEscalation, raiseEscalation, reopenEscalation } from '@/lib/data/actions'
 import { EV, track } from '@/lib/analytics/track'
 import { dateTime, relative } from '@/lib/format'
@@ -13,18 +14,16 @@ import { dateTime, relative } from '@/lib/format'
 /**
  * §9.4 — escalations.
  *
- * Two things this screen has to be honest about, because both cost the partner
- * money or time if it is not:
- *
  * **An open escalation holds that order's maturation.** §10.5 says so, and a
  * partner who raises a ticket about a short delivery and then finds their
  * cashback delayed with no warning reads it as a punishment for complaining. So
  * the form says it up front, on the way in.
  *
- * **Attachments are not built.** §9.4 specifies images and PDFs up to 10MB;
- * nothing in this app uploads to Supabase Storage yet. The column exists and the
- * control does not, and the form says to send files to the KAM — rather than
- * showing a file picker that silently drops what a partner selected.
+ * **The image attachment** goes through the same `app/api/upload/route.ts`
+ * door as everything else — session-checked, then written with the service
+ * role to `studio-media`. §9.4 also specifies PDFs up to 5, which this single
+ * image field does not attempt; a partner with more to show still sends the
+ * rest to their key account manager.
  */
 const CATEGORIES = [
   { key: 'delivery_delay', label: 'Delivery is late' },
@@ -69,6 +68,7 @@ export function Escalations({
   const [raising, setRaising] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
+  const [attachment, setAttachment] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
   function submit(form: FormData) {
@@ -80,10 +80,12 @@ export function Escalations({
         description: String(form.get('description') ?? ''),
         referral_id: referralId,
         order_id: String(form.get('order_id') ?? '') || null,
+        attachments: attachment ? [attachment] : [],
       })
       if (!res.ok) return setProblem(res.error)
       track(EV.escalation_raised, { category: String(form.get('category') ?? 'other'), has_order: Boolean(form.get('order_id')) })
       setRaising(false)
+      setAttachment(null)
       router.refresh()
     })
   }
@@ -126,7 +128,10 @@ export function Escalations({
 
       <Modal
         open={raising}
-        onClose={() => setRaising(false)}
+        onClose={() => {
+          setRaising(false)
+          setAttachment(null)
+        }}
         title="Raise an escalation"
         hint="The more specific the better — this goes straight to the people who can fix it."
       >
@@ -151,23 +156,36 @@ export function Escalations({
             </Field>
           ) : null}
 
-          <Field label="One line" required hint="What you would say on the phone.">
+          <Field label="Title" required hint="What you would say on the phone.">
             <Input name="subject" placeholder="Two boxes short on the bedroom flooring" />
           </Field>
 
-          <Field label="What happened" required>
+          <Field label="Please describe your concern" required>
             <Textarea name="description" rows={4} />
           </Field>
 
+          <Field label="Attach an image" hint="Optional — a photo of the damage or the delivery, for instance.">
+            {attachment ? (
+              <div className="flex items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={attachment} alt="" className="size-12 rounded-md border border-line object-cover" />
+                <Button type="button" size="sm" variant="ghost" onClick={() => setAttachment(null)}>
+                  <X size={13} /> Remove
+                </Button>
+              </div>
+            ) : (
+              <Uploader accept="image/*" label="Attach an image" onUploaded={setAttachment} onError={setProblem} />
+            )}
+          </Field>
+
           <p className="rounded-lg border border-line bg-raised px-3 py-2 text-[11px] leading-relaxed text-ink-soft">
-            <strong className="text-ink">Two things worth knowing.</strong> If this is about an order, that order stops
-            maturing until the escalation is closed — it is not lost, it just does not count towards a reward while
-            there is still a question over it. And we cannot take file attachments here yet; send photos to your key
-            account manager and we will attach them to this ticket.
+            <strong className="text-ink">Worth knowing.</strong> If this is about an order, that order stops maturing
+            until the escalation is closed — it is not lost, it just does not count towards a reward while there is
+            still a question over it.
           </p>
 
           <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="ghost" onClick={() => setRaising(false)}>Cancel</Button>
+            <Button type="button" variant="ghost" onClick={() => { setRaising(false); setAttachment(null) }}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={pending}>{pending ? 'Sending…' : 'Raise it'}</Button>
           </div>
         </form>
@@ -209,6 +227,17 @@ function Row({
       {open ? (
         <div className="space-y-3 border-t border-line bg-raised px-4 py-3">
           <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink-soft">{e.description}</p>
+
+          {e.attachments?.length ? (
+            <div className="flex flex-wrap gap-2">
+              {e.attachments.map((url) => (
+                <a key={url} href={url} target="_blank" rel="noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="Escalation attachment" className="size-16 rounded-md border border-line object-cover" />
+                </a>
+              ))}
+            </div>
+          ) : null}
 
           {/* §9.4: "Threaded comments visible to partner; internal notes
               hidden." There is no filter here — RLS does the hiding, and a

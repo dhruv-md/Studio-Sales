@@ -90,6 +90,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         eyebrow="for Partners"
         footerTitle={partner.firm_name}
         footerSub={email ?? partner.phone}
+        logoUrl={partner.logo_url}
       />
       <div className="min-w-0 flex-1">{children}</div>
     </div>
