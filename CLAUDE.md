@@ -98,12 +98,13 @@ resolve DNS for at all; the Management API path has no such dependency.)
 
 **Applied is not the same as populated.** 005 added the columns the incentive
 programme needs; nothing fills them yet. On production today every order is
-missing `delivered_on` and `discount_availed`, and every referral has
-`consent_given` null — so maturity reads "awaiting a delivery date", net
-cashback is withheld in favour of gross, and every client shows §14.5's
-aggregate view. That is the app being correct about an empty input, not a bug,
-and the producer that fixes it is the CRM bridge in
-`materialdepot-crm/docs/b2b/partner-bridge.md`.
+missing `delivered_on` and `discount_availed` — so maturity reads "awaiting a
+delivery date" and net cashback is withheld in favour of gross. That is the
+app being correct about an empty input, not a bug, and the producer that
+fixes it is the CRM bridge in `materialdepot-crm/docs/b2b/partner-bridge.md`.
+(`referral.consent_given` is also still null for everyone, but that no
+longer changes what a partner sees — the §14.5 aggregate-only view was
+removed 2026-09-17, `docs/referrals.md`.)
 
 **A migration committed here is not evidence it was applied.** If a column is
 missing at runtime, check the live table before assuming the code is wrong. And
@@ -142,7 +143,7 @@ skip that.
 | `lib/data/**` | Partner reads/writes (`queries.ts`, `actions.ts`), console reads/writes (`console-*.ts`), **your own account (`account-actions.ts`, either app)**, the `Result` type, the session and the role gates. |
 | `lib/auth/credentials.ts` | The one-time password generator, and the AES-GCM seal that keeps it until its owner changes it — `docs/auth.md`. |
 | `components/**` | `ui/` primitives, then one folder per module. `console/` is staff-only and must never be imported from `app/(app)/` — `account/` exists because of that rule, holding the one component both apps need. |
-| `app/(app)/settings` | §13 — studio profile, team, theme, notifications, and the Sign-in tab that changes a password. |
+| `app/(app)/settings` | §13 — studio profile, team, theme, and the Sign-in tab that changes a password. Notifications tab removed 2026-09-17 — nothing sends one yet. |
 | `app/(console)/console/settings` | A staff member's own account and password. On **every** console role's sidebar, because it is the only way to stop the console being able to read the password you were issued. |
 | `test/domain.test.ts` | The pure rules, asserted at their boundaries — including every published figure of the §10 slab tables. `npm run test:domain`. |
 | `supabase/migrations/**` | The schema and the RLS policies. Pasted by hand. |
@@ -197,16 +198,23 @@ money is stored except the orders themselves and an admin's decision on each one
 
 ### 5. An unknown is not a zero, and it is not a no
 
-Three places this rule decides money or privacy, and all three carry the third
-state rather than collapsing it:
+Two places this rule decides money, and both carry the third state rather
+than collapsing it:
 
 - `discount_availed` null = **we have not been told**, not ₹0. The net cashback
   figure is withheld and the screen says why (`docs/rewards.md`).
 - `delivered_on` null = the maturation clock has not started, not "matured".
-- `referral.consent_given` null = **not asked**, not refused (`docs/referrals.md`).
 
-Collapsing any of them compiles, reads fine, and is wrong in the direction that
-costs somebody money or exposes somebody's shopping.
+Collapsing either of them compiles, reads fine, and is wrong in the direction
+that costs somebody money.
+
+`referral.consent_given` used to be a third, privacy-facing example here —
+null meant **not asked**, not refused, and gated the client detail page down
+to an aggregate view. Removed 2026-09-17, on instruction: every order already
+carries the client's consent to be shared with the referring firm, so the
+gate had nothing left to protect. The column and its three states still exist
+(a trigger still refuses a firm's own write to it), but nothing in the app
+reads it any more — `docs/referrals.md`.
 
 A fourth arrived with `006_credentials.sql`, and it splits **four** ways rather
 than three. Looking up the password a login was issued returns `current`,
@@ -263,7 +271,7 @@ Module detail lives in `docs/`, read on demand:
 | `docs/rewards.md` | **The §10 slab programme** — the two ladders, the formula, maturation, go-live, and why `reward_tier` is not the programme |
 | `docs/escalations.md` | §9.4, and why an open one holds an order's money |
 | `docs/analytics.md` | §14.6 — the one wrapper, the taxonomy, and what is deliberately not wired |
-| `docs/settings.md` | §13 — profile, team, the theme and its WCAG gate, notifications, and the Sign-in tab on both apps |
+| `docs/settings.md` | §13 — profile, team, the theme and its WCAG gate, and the Sign-in tab on both apps |
 | `docs/projects.md` | **The Projects tab** — mood boards, not the workspace; sharing, uploads, the PDF, and why `/p/` is exempt from the sign-in gate |
 | `docs/kam-bridge.md` | The outbox that reflects a new referral/visit into the CRM's KAM tab — built here, nothing on the CRM side yet |
 | `docs/open-questions.md` | What is decided by default and needs a human to confirm |
