@@ -278,9 +278,13 @@ export type Referral = {
   pushed_at?: string | null
 }
 
+export type PhoneApproval = 'pending' | 'approved' | 'rejected'
+
 /** 007_studio_v2.sql — every number this client is known to place orders
- *  through, not just `referral.md_phone`. Cart/order matching reads all of
- *  them; see `docs/referrals.md`. */
+ *  through, not just `referral.md_phone`. Cart/order matching reads only the
+ *  `approved` ones (008_phone_review.sql) — a number a firm just added sits
+ *  `pending` until Material Depot's admin says it counts. `client` is always
+ *  approved: it is the number the referral itself was made on. */
 export type ReferralPhone = {
   id: string
   referral_id: string
@@ -288,6 +292,10 @@ export type ReferralPhone = {
   label: 'partner' | 'client' | 'additional'
   added_by: string | null
   created_at: string
+  status: PhoneApproval
+  reviewed_by: string | null
+  reviewed_at: string | null
+  review_note: string | null
 }
 
 export type VisitRequestStatus = 'requested' | 'bm_assigned' | 'completed' | 'cancelled'

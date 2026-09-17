@@ -15,11 +15,16 @@ const LABEL: Record<ReferralPhone['label'], string> = {
 
 /**
  * A client does not always order through the number they were referred on —
- * sometimes it is their partner's, sometimes another number entirely. Every
- * number linked here is read when matching carts and orders back to this
+ * sometimes it is their partner's, sometimes another number entirely. An
+ * APPROVED number here is read when matching carts and orders back to this
  * client, not just `referral.md_phone`. These are numbers the firm itself
  * typed in, so — unlike the client's primary number elsewhere on this page —
  * they are shown in full rather than masked.
+ *
+ * 008_phone_review.sql: a number a firm adds arrives `pending` and does not
+ * count for that matching until a Material Depot admin approves it in
+ * `/console/approvals`. `client` is the exception — it is the number the
+ * referral itself was made on, already trusted, so it is always `approved`.
  */
 export function NumbersPanel({ referralId, phones }: { referralId: string; phones: ReferralPhone[] }) {
   const router = useRouter()
@@ -58,6 +63,11 @@ export function NumbersPanel({ referralId, phones }: { referralId: string; phone
             <span className="tnum text-ink">{p.phone}</span>
             <span className="flex items-center gap-1.5">
               <Badge tone={p.label === 'client' ? 'brand' : 'neutral'}>{LABEL[p.label]}</Badge>
+              {p.status === 'pending' ? (
+                <Badge tone="warn">Awaiting approval</Badge>
+              ) : p.status === 'rejected' ? (
+                <Badge tone="bad">Not approved</Badge>
+              ) : null}
               {p.label !== 'client' ? (
                 <button
                   onClick={() => remove(p.id)}

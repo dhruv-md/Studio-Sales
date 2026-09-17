@@ -127,6 +127,10 @@ export async function POST(req: Request) {
   // belongs to the same client. Both sources feed the same map, deduplicated
   // by referral id: a phone that happens to equal both a referral's md_phone
   // AND one of its own referral_phone rows is one match, not two.
+  //
+  // 008_phone_review.sql: only `approved` rows match here. A number a firm
+  // just typed in sits `pending` until Material Depot's admin says it counts
+  // — matching against it early is exactly the thing this gate exists to stop.
   const byPhone = new Map<string, Map<string, { id: string; partner_id: string }>>()
   function addHit(phone: string, hit: { id: string; partner_id: string }) {
     const hits = byPhone.get(phone) ?? new Map()
@@ -141,6 +145,7 @@ export async function POST(req: Request) {
   const { data: extraPhones, error: extraErr } = await db
     .from('referral_phone')
     .select('phone, referral_id')
+    .eq('status', 'approved')
     .in('phone', [...phones])
   if (extraErr) {
     return NextResponse.json({ error: `referral_phone lookup failed: ${extraErr.message}` }, { status: 500 })
