@@ -10,3 +10,4 @@ next-env.d.ts
 supabase/test/node_modules
 supabase/test/data
 supabase/test/pg.log
+supabase/.temp

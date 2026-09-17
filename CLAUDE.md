@@ -63,13 +63,38 @@ job rather than an hour of data entry.
 ## The one thing to know first
 
 **No SQL in this repo runs itself.** `supabase/migrations/*.sql` and
-`supabase/seed/001_demo.sql` are pasted into the Supabase SQL Editor by hand.
-001–004 were applied on 2026-09-11, **005 on 2026-09-16** — verified by probing
-every column, table and function over PostgREST rather than by being told.
-**006 on 2026-09-16** as well — table, both trailing functions and the anon
-denial all probed live, including a real INSERT attempt.
+`supabase/seed/*.sql` are pasted into the Supabase SQL Editor by hand, or run
+through the Management API (see the landmine below — as of 2026-09-17 that is
+the more reliable of the two). 001–004 were applied on 2026-09-11, **005 and
+006 on 2026-09-16**, **007 on 2026-09-17** (its own README checkbox said
+otherwise until probed live: `studio_project` and `staff_user.photo_url` both
+`200`, not `404`) — each verified by probing over PostgREST rather than by
+being told. All three seeds (`001_demo.sql`, `002_console.sql`,
+`003_bulk_variety.sql`) are applied and probed live as of 2026-09-17.
 `supabase/migrations/README.md` is the checklist and says which of the three
 Material Depot Supabase projects this one is.
+
+**The Supabase SQL Editor silently mangles long pastes — verify against the
+table, never against "no error shown."** Confirmed 2026-09-17: pasting
+`002_console.sql` (300+ lines) threw `42P01: relation "another" does not
+exist`; rewording that exact string produced `relation "a" does not exist` on
+the next paste. A byte-identical run through `supabase/test`'s real Postgres
+had zero errors both times — the SQL was never wrong, and rewording is
+whack-a-mole against wherever you last touched the file, not a fix. Worse, it
+can fail with **no error at all**: `001_demo.sql`'s own tail section (one
+referral's consent flag, two referrals' project-type tags, the one escalation
+thread) sat missing in production for weeks — the paste had reported success.
+Only querying the live table caught it. The reliable alternative: Supabase's
+Management API is pure HTTPS and skips the browser editor's parser —
+`POST https://api.supabase.com/v1/projects/<ref>/database/query`,
+`Authorization: Bearer <personal access token>`, body
+`{"query": "<the whole file, as one string>"}`. A token comes from
+https://supabase.com/dashboard/account/tokens — treat it like the service-role
+key, never commit it, and rotate it if it is ever pasted somewhere it
+shouldn't be. (The CLI's own `supabase db query --linked` looks like the
+obvious tool for this but opens a **direct Postgres connection**, which several
+sandboxed environments — including the one this note was written from — cannot
+resolve DNS for at all; the Management API path has no such dependency.)
 
 **Applied is not the same as populated.** 005 added the columns the incentive
 programme needs; nothing fills them yet. On production today every order is
@@ -90,10 +115,13 @@ otherwise have died a third of the way through someone's paste.
 a deploy that lands before `003`/`004` have been pasted shows every partner "We
 could not load your workspace" until somebody notices.
 
-Demo login, once the seed is in: `demo.studio@materialdepot.com` /
-`DemoStudio2026!`. This Supabase project has **email confirmation ON**, so a
-fresh sign-up gets "check your email" and no session — the seed confirms that
-one address for you.
+Demo login: `demo.studio@materialdepot.com` / `DemoStudio2026!` (Studio Terra —
+the rich, fully-populated firm). Five more, spanning every partner lifecycle
+state (never-ordered, dormant, brand-new empty account, gold-tier), are in
+`supabase/seed/003_README.md`. This Supabase project has **email confirmation
+ON**, so a normal sign-up gets "check your email" and no session — every demo
+account above was created confirmed via the Auth Admin API specifically to
+skip that.
 
 ## Shape of the app
 
