@@ -8,7 +8,7 @@ import { phone10 } from '@/lib/format'
 import { generatePassword, seal, unseal } from '@/lib/auth/credentials'
 import { recordUnlockedTiers } from './unlock'
 import type {
-  OrderApproval, PartnerApplication, PhoneApproval, PortfolioStatus, ProspectStage, StaffRole, TouchKind,
+  OrderApproval, PartnerApplication, PortfolioStatus, ProspectStage, StaffRole, TouchKind,
 } from '@/lib/domain/types'
 import type { OrderNotCounted } from '@/lib/domain/reasons'
 
@@ -135,29 +135,6 @@ export async function approveOrderAndNotify(
 // ============================================================ linked numbers
 
 /**
- * 008_phone_review.sql — a number a firm links to a client does not count for
- * cart/order matching until an admin approves it here. Same shape as
- * `reviewOrder`: a SECURITY DEFINER function re-checks `app_is_admin()` inside
- * Postgres, so a bug in `requireStaff` cannot register a number by itself.
- */
-export async function reviewPhone(phoneId: string, status: PhoneApproval, note?: string | null) {
-  const staff = await requireStaff(['admin'])
-  if (!staff.ok) return staff
-
-  const sb = await supabaseServer()
-  const { data, error } = await sb.rpc('review_referral_phone', {
-    p_phone_id: phoneId,
-    p_status: status,
-    p_note: note?.trim() || null,
-  })
-  if (error) return fail(`Could not save that decision: ${error.message}`)
-  revalidatePath('/console/approvals')
-  return ok(data)
-}
-
-// ================================================================ portfolio
-
-/**
  * Approve or reject a number a partner linked to one of their clients. Goes
  * through `review_referral_phone()`, which re-checks `app_is_admin()` inside
  * Postgres — `referral_phone` has no UPDATE policy, so this function is the only
@@ -173,6 +150,8 @@ export async function reviewReferralPhone(id: string, status: 'approved' | 'reje
   revalidatePath('/console/approvals')
   return ok(true)
 }
+
+// ================================================================ portfolio
 
 export async function reviewPortfolio(itemId: string, status: PortfolioStatus, note?: string | null) {
   const staff = await requireStaff(['admin'])

@@ -9,6 +9,7 @@ import {
 } from '@/components/ui'
 import { Modal } from '@/components/ui/Modal'
 import { approveOrderAndNotify, reviewOrder, reviewPortfolio, reviewReferralPhone } from '@/lib/data/console-actions'
+// (reviewReferralPhone drives the Numbers tab's direct approve/reject buttons.)
 import type { OrderWithOwner, PhoneWithOwner, PortfolioWithFirm } from '@/lib/data/console-queries'
 import {
   codeLabel, ORDER_NOT_COUNTED_CODES, PORTFOLIO_REJECTION_CODES, type OrderNotCounted,
@@ -16,13 +17,6 @@ import {
 import { date, inr } from '@/lib/format'
 import { marketLabel } from '@/lib/domain/markets'
 
-type Tab = 'orders' | 'portfolio' | 'numbers'
-
-const PHONE_LABEL: Record<PhoneWithOwner['label'], string> = {
-  client: 'Their number',
-  partner: 'Partner’s number',
-  additional: 'Additional',
-}
 type Tab = 'orders' | 'portfolio' | 'numbers'
 
 const PHONE_LABEL: Record<PhoneWithOwner['label'], string> = {
@@ -73,12 +67,6 @@ export function ApprovalQueue({
   const decidedOrders = orders.filter((o) => o.approval_status !== 'pending').slice(0, 25)
   const pendingWork = portfolio.filter((p) => p.status === 'submitted')
   const publishedWork = portfolio.filter((p) => p.status === 'published').slice(0, 25)
-  const pendingPhones = phones.filter((p) => p.status === 'pending')
-  // `status` is `undefined`, not `'pending'`, on any row read before 008 has
-  // been pasted (`select('*')` on a column that does not exist yet) — that is
-  // "we do not know", not "rejected", so it is excluded here rather than
-  // falling into the decided list with a wrong-looking badge.
-  const decidedPhones = phones.filter((p) => p.status && p.status !== 'pending' && p.label !== 'client').slice(0, 25)
 
   function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>, done?: () => void) {
     setError(null)
@@ -94,11 +82,10 @@ export function ApprovalQueue({
     if (!rejecting) return
     const { kind, id } = rejecting
     run(
-      () => {
-        if (kind === 'orders') return reviewOrder(id, 'rejected', note, code as OrderNotCounted)
-        if (kind === 'numbers') return reviewPhone(id, 'rejected', note)
-        return reviewPortfolio(id, 'rejected', `${codeLabel(code)}. ${note}`.trim())
-      },
+      () =>
+        kind === 'orders'
+          ? reviewOrder(id, 'rejected', note, code as OrderNotCounted)
+          : reviewPortfolio(id, 'rejected', `${codeLabel(code)}. ${note}`.trim()),
       () => setRejecting(null),
     )
   }

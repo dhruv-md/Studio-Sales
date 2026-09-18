@@ -278,8 +278,6 @@ export type Referral = {
   pushed_at?: string | null
 }
 
-export type PhoneApproval = 'pending' | 'approved' | 'rejected'
-
 /** 007_studio_v2.sql — every number this client is known to place orders
  *  through, not just `referral.md_phone`. Cart/order matching reads only the
  *  `approved` ones (008_phone_review.sql) — a number a firm just added sits

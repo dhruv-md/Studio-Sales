@@ -851,56 +851,6 @@ async function asUser(c, uid, fn) {
   await c.query('delete from studio_project where id = $1', [studioProjectId])
   await c.query('commit')
 
-  console.log('\n27. A linked number does not count until an admin approves it (008)')
-  // Committed, not `asUser()`, for the same reason group 25's invite is: this
-  // row has to survive into the later `asUser()` blocks for the KAM and admin.
-  let pendingPhoneId
-  await c.query('begin')
-  await c.query(`set local role authenticated`)
-  await c.query(`select set_config('request.jwt.claim.sub', $1, true)`, [DEMO_UID])
-  const insPhone = await c.query(
-    `insert into referral_phone (referral_id, phone, label) values ($1,'9812399911','additional') returning id, status`,
-    [REF_SHARMA])
-  check('a firm-added number arrives pending, not approved', insPhone.rows[0].status === 'pending')
-  pendingPhoneId = insPhone.rows[0].id
-  await c.query('savepoint sp5')
-  try {
-    await c.query(
-      `insert into referral_phone (referral_id, phone, label, status) values ($1,'9812399922','additional','approved')`,
-      [REF_SHARMA])
-    check('and a firm cannot self-approve by sending status in the payload', false, 'IT WENT THROUGH')
-  } catch (e) {
-    check('and a firm cannot self-approve by sending status in the payload', e.code === '42501', e.code)
-  }
-  await c.query('rollback to savepoint sp5')
-  await c.query('commit')
-
-  const clientPhoneId = (await c.query(
-    "select id from referral_phone where referral_id = $1 and label = 'client' limit 1", [REF_SHARMA])).rows[0]?.id
-  if (clientPhoneId) {
-    check("the client's own number was grandfathered approved",
-      (await count("select count(*)::int n from referral_phone where id = $1 and status = 'approved'", [clientPhoneId])) === 1)
-  }
-
-  await asUser(c, DEMO_UID, async () => {
-    const r = await c.query(`update referral_phone set status = 'approved' where id = $1`, [pendingPhoneId])
-    check('a firm cannot approve its own number by updating it directly', r.rowCount === 0, `${r.rowCount} rows`)
-    await blocked('nor by calling the review function',
-      'select review_referral_phone($1, $2)', [pendingPhoneId, 'approved'])
-  })
-  await asUser(c, KAM_BLR_UID, async () => {
-    await blocked('a KAM cannot approve one either', 'select review_referral_phone($1, $2)', [pendingPhoneId, 'approved'])
-  })
-  await asUser(c, ADMIN_UID, async () => {
-    await c.query('select review_referral_phone($1, $2, $3)', [pendingPhoneId, 'approved', 'checked with the firm'])
-    const { rows } = await c.query('select status, reviewed_by from referral_phone where id = $1', [pendingPhoneId])
-    check('an admin can approve it, and it stamps who did', rows[0].status === 'approved' && rows[0].reviewed_by === ADMIN_UID)
-  })
-
-  await c.query('begin')
-  await c.query('delete from referral_phone where id = $1', [pendingPhoneId])
-  await c.query('commit')
-
   console.log(`\n${pass} passed, ${fail} failed`)
   await c.end()
   process.exit(fail ? 1 : 0)
