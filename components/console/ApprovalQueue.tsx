@@ -23,17 +23,26 @@ const PHONE_LABEL: Record<PhoneWithOwner['label'], string> = {
   partner: 'Partner’s number',
   additional: 'Additional',
 }
+type Tab = 'orders' | 'portfolio' | 'numbers'
+
+const PHONE_LABEL: Record<PhoneWithOwner['label'], string> = {
+  client: 'Their number',
+  partner: 'Partner’s number',
+  additional: 'Additional',
+}
 
 /**
  * The admin's verification desk.
  *
- * Two queues, one screen, because they are the same job: something a partner has
- * put in front of Material Depot that needs a person to say yes to. An order is
- * the one that costs money — it is what the reward ladder is computed from — so
- * it is first and it is the default tab.
+ * Three queues, one screen, because they are the same job: something a partner
+ * has put in front of Material Depot that needs a person to say yes to. An
+ * order is the one that costs money — it is what the reward ladder is computed
+ * from — so it is first and it is the default tab.
  *
- * Rejecting always asks for a reason. An unexplained rejection turns into a
- * phone call to a KAM who has no idea either.
+ * Rejecting an order or a portfolio piece always asks for a reason code
+ * (PRD Appendix B) — an unexplained rejection turns into a phone call to a KAM
+ * who has no idea either. A linked number has no Appendix B entry of its own,
+ * so its rejection just takes a free-text note.
  */
 export function ApprovalQueue({
   orders,
@@ -64,6 +73,12 @@ export function ApprovalQueue({
   const decidedOrders = orders.filter((o) => o.approval_status !== 'pending').slice(0, 25)
   const pendingWork = portfolio.filter((p) => p.status === 'submitted')
   const publishedWork = portfolio.filter((p) => p.status === 'published').slice(0, 25)
+  const pendingPhones = phones.filter((p) => p.status === 'pending')
+  // `status` is `undefined`, not `'pending'`, on any row read before 008 has
+  // been pasted (`select('*')` on a column that does not exist yet) — that is
+  // "we do not know", not "rejected", so it is excluded here rather than
+  // falling into the decided list with a wrong-looking badge.
+  const decidedPhones = phones.filter((p) => p.status && p.status !== 'pending' && p.label !== 'client').slice(0, 25)
 
   function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>, done?: () => void) {
     setError(null)
@@ -79,10 +94,11 @@ export function ApprovalQueue({
     if (!rejecting) return
     const { kind, id } = rejecting
     run(
-      () =>
-        kind === 'orders'
-          ? reviewOrder(id, 'rejected', note, code as OrderNotCounted)
-          : reviewPortfolio(id, 'rejected', `${codeLabel(code)}. ${note}`.trim()),
+      () => {
+        if (kind === 'orders') return reviewOrder(id, 'rejected', note, code as OrderNotCounted)
+        if (kind === 'numbers') return reviewPhone(id, 'rejected', note)
+        return reviewPortfolio(id, 'rejected', `${codeLabel(code)}. ${note}`.trim())
+      },
       () => setRejecting(null),
     )
   }
@@ -404,35 +420,45 @@ export function ApprovalQueue({
       <Modal
         open={rejecting !== null}
         onClose={() => setRejecting(null)}
-        title={rejecting?.kind === 'orders' ? 'Do not count this order' : 'Send this back to the partner'}
+        title={
+          rejecting?.kind === 'orders'
+            ? 'Do not count this order'
+            : rejecting?.kind === 'numbers'
+              ? 'Do not approve this number'
+              : 'Send this back to the partner'
+        }
         hint={rejecting?.label}
       >
         <form
           action={(form) => reject(String(form.get('note') ?? ''), String(form.get('code') ?? 'OTHER'))}
           className="space-y-3"
         >
-          {/* PRD Appendix B. The code is picked from a list rather than typed,
-              because the partner is shown a sentence derived from it — and six
-              hand-typed phrasings of "already attributed" is what two firms
-              comparing notes would find. The database refuses a decline with no
-              code, so this cannot be skipped by a bug in this form. */}
-          <Field
-            label="Reason"
-            required
-            hint="The partner is shown a plain-language version of this against the order."
-          >
-            <Select name="code" defaultValue={rejecting?.kind === 'orders' ? 'CLIENT_NOT_ATTRIBUTED' : 'INCOMPLETE_DETAILS'} required>
-              {(rejecting?.kind === 'orders' ? ORDER_NOT_COUNTED_CODES : PORTFOLIO_REJECTION_CODES).map((c) => (
-                <option key={c} value={c}>{codeLabel(c)}</option>
-              ))}
-            </Select>
-          </Field>
+          {rejecting?.kind === 'numbers' ? null : (
+            // PRD Appendix B. The code is picked from a list rather than typed,
+            // because the partner is shown a sentence derived from it — and six
+            // hand-typed phrasings of "already attributed" is what two firms
+            // comparing notes would find. The database refuses a decline with no
+            // code, so this cannot be skipped by a bug in this form.
+            <Field
+              label="Reason"
+              required
+              hint="The partner is shown a plain-language version of this against the order."
+            >
+              <Select name="code" defaultValue={rejecting?.kind === 'orders' ? 'CLIENT_NOT_ATTRIBUTED' : 'INCOMPLETE_DETAILS'} required>
+                {(rejecting?.kind === 'orders' ? ORDER_NOT_COUNTED_CODES : PORTFOLIO_REJECTION_CODES).map((c) => (
+                  <option key={c} value={c}>{codeLabel(c)}</option>
+                ))}
+              </Select>
+            </Field>
+          )}
           <Field
             label="Anything to add"
             hint={
               rejecting?.kind === 'orders'
                 ? 'Optional, and shown to the partner after the reason. Their KAM needs to be able to explain it.'
-                : 'The partner sees this word for word, and it is what they act on.'
+                : rejecting?.kind === 'numbers'
+                  ? 'Optional — not shown to the partner today, just a note for whoever looks at this next.'
+                  : 'The partner sees this word for word, and it is what they act on.'
             }
           >
             <Textarea name="note" rows={3} />

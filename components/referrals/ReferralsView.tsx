@@ -312,7 +312,10 @@ export function ReferralsView({
             </Card>
 
             <Card>
-              <CardHead title="Numbers linked to this client" hint="Carts and orders on any of these count for them" />
+              <CardHead
+                title="Numbers linked to this client"
+                hint="Carts and orders on any approved number count for them — a number you add is checked by Material Depot before it counts"
+              />
               {phonesError ? (
                 <div className="px-4 py-3"><Problem title="Numbers could not be loaded" detail={phonesError} /></div>
               ) : (

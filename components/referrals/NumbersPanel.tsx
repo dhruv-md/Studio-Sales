@@ -15,8 +15,8 @@ const LABEL: Record<ReferralPhone['label'], string> = {
 
 /**
  * A client does not always order through the number they were referred on —
- * sometimes it is their partner's, sometimes another number entirely. Every
- * number linked here is read when matching carts and orders back to this
+ * sometimes it is their partner's, sometimes another number entirely. An
+ * APPROVED number here is read when matching carts and orders back to this
  * client, not just `referral.md_phone`. These are numbers the firm itself
  * typed in, so — unlike the client's primary number elsewhere on this page —
  * they are shown in full rather than masked.

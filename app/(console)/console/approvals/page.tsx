@@ -22,7 +22,7 @@ export default async function ApprovalsPage() {
     <>
       <PageHead
         title="Verify"
-        hint="An order counts towards a partner's rewards only once it has been checked here, and work goes on our site only once it has been read."
+        hint="An order counts towards a partner's rewards only once it has been checked here, work goes on our site only once it has been read, and a number a firm links to a client only matches a cart or order once it has been approved."
       />
       <div className="px-4 py-5 md:px-6">
         <ApprovalQueue

@@ -61,6 +61,13 @@ honest, not silent:
   is the correct behaviour for an unknown consent state and the wrong answer for
   a client who has actually agreed. Paste 005 first.
 
+**008 is the opposite of 005: it BREAKS if the deploy lands first, it does not
+degrade.** `/api/sync/referrals` filters `referral_phone` on `.eq('status',
+'approved')`, and a column that does not exist yet is a hard Postgres error,
+not an empty result — every sync call 500s and no cart or order matches
+anything, for every firm, until the paste happens. Paste 008 first, here more
+than anywhere else in this file.
+
 Both migrations, and the seed, are tested against a real Postgres by
 `supabase/test` — `cd supabase/test && npm install && npm run all`. That suite
 is also what asserts one architect cannot read another's rows, so run it before

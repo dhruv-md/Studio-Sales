@@ -71,6 +71,11 @@ otherwise until probed live: `studio_project` and `staff_user.photo_url` both
 `200`, not `404`) — each verified by probing over PostgREST rather than by
 being told. All three seeds (`001_demo.sql`, `002_console.sql`,
 `003_bulk_variety.sql`) are applied and probed live as of 2026-09-17.
+**008 on 2026-09-17**, pasted by hand before the deploy that needed it landed
+— probed live over PostgREST: `referral_phone?select=status` returns `200`
+with every existing row (client-label and firm-added alike) grandfathered to
+`approved`, and `rpc/review_referral_phone` correctly refuses the service
+role with `only a Material Depot admin can approve a linked number`.
 `supabase/migrations/README.md` is the checklist and says which of the three
 Material Depot Supabase projects this one is.
 
@@ -248,7 +253,10 @@ throw it away. `supabase/test/rlstest.js` group 8 checks all nine by name.
 Only an `approved` order counts towards a partner's rewards, and
 `referral_order` has **no UPDATE policy for anybody**. The single thing that can
 change that column is `review_referral_order()`, which re-checks
-`app_is_admin()` inside Postgres. Same for publishing a portfolio piece.
+`app_is_admin()` inside Postgres. Same for publishing a portfolio piece, and
+since `008_phone_review.sql` the same for a `referral_phone` a firm links to a
+client — it does not count for cart/order matching until
+`review_referral_phone()` approves it.
 
 App-layer role checks (`requireStaff`) are there so the UI can be honest, not so
 the database can be trusted to a form field. A bug in one must not be enough to
