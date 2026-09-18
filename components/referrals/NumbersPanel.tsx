@@ -20,6 +20,9 @@ const LABEL: Record<ReferralPhone['label'], string> = {
  * client, not just `referral.md_phone`. These are numbers the firm itself
  * typed in, so — unlike the client's primary number elsewhere on this page —
  * they are shown in full rather than masked.
+ *
+ * Adding or removing a number here changes which numbers the live pull (the
+ * Refresh at the top of the client) looks up.
  */
 export function NumbersPanel({ referralId, phones }: { referralId: string; phones: ReferralPhone[] }) {
   const router = useRouter()
@@ -55,9 +58,17 @@ export function NumbersPanel({ referralId, phones }: { referralId: string; phone
       <ul className="space-y-1.5">
         {phones.map((p) => (
           <li key={p.id} className="flex items-center justify-between gap-2 text-sm">
-            <span className="tnum text-ink">{p.phone}</span>
+            <span className={`tnum ${p.approval_status === 'rejected' ? 'text-ink-faint line-through' : 'text-ink'}`}>
+              {p.phone}
+            </span>
             <span className="flex items-center gap-1.5">
-              <Badge tone={p.label === 'client' ? 'brand' : 'neutral'}>{LABEL[p.label]}</Badge>
+              {p.approval_status === 'pending' ? (
+                <Badge tone="warn">Pending approval</Badge>
+              ) : p.approval_status === 'rejected' ? (
+                <Badge tone="bad">Rejected</Badge>
+              ) : (
+                <Badge tone={p.label === 'client' ? 'brand' : 'neutral'}>{LABEL[p.label]}</Badge>
+              )}
               {p.label !== 'client' ? (
                 <button
                   onClick={() => remove(p.id)}
@@ -99,6 +110,10 @@ export function NumbersPanel({ referralId, phones }: { referralId: string; phone
           <Plus size={12} /> Add a number
         </button>
       )}
+
+      <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+        A number you add is checked by Material Depot before its carts and orders count for this client.
+      </p>
     </div>
   )
 }

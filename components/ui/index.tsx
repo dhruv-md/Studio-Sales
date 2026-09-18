@@ -3,11 +3,16 @@ import { cn } from '@/lib/cn'
 
 // -------------------------------------------------------------------- card
 
+/** One soft, warm elevation, shared by every surface that sits on the ground.
+ *  Two layered shadows — a tight contact shadow plus a wider, lifted one — read
+ *  as considered depth rather than a flat outline. */
+const CARD_SHADOW = 'shadow-[0_1px_2px_rgba(32,27,22,0.04),0_6px_20px_-12px_rgba(32,27,22,0.14)]'
+
 export function Card({ className, ...p }: React.ComponentProps<'div'>) {
   return (
     <div
       {...p}
-      className={cn('rounded-[var(--radius-card)] border border-line bg-surface', className)}
+      className={cn('rounded-[var(--radius-card)] border border-line bg-surface', CARD_SHADOW, className)}
     />
   )
 }
@@ -176,7 +181,7 @@ export function Stat({
   className?: string
 }) {
   return (
-    <div className={cn('rounded-[var(--radius-card)] border border-line bg-surface p-3.5', className)}>
+    <div className={cn('rounded-[var(--radius-card)] border border-line bg-surface p-4', CARD_SHADOW, className)}>
       <div className="text-[11px] font-medium tracking-wide text-ink-faint uppercase">{label}</div>
       <div
         className={cn(
@@ -226,10 +231,14 @@ export function Empty({
   icon?: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
-      {icon ? <div className="mb-3 text-ink-faint">{icon}</div> : null}
-      <p className="font-display text-[15px] font-semibold text-ink">{title}</p>
-      {body ? <p className="mt-1 max-w-sm text-sm text-ink-soft">{body}</p> : null}
+    <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
+      {icon ? (
+        <div className="mb-3 flex size-11 items-center justify-center rounded-full border border-line bg-raised text-ink-faint">
+          {icon}
+        </div>
+      ) : null}
+      <p className="font-display text-sm font-semibold text-ink">{title}</p>
+      {body ? <p className="mt-1 max-w-xs text-xs leading-relaxed text-ink-soft">{body}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   )
@@ -261,7 +270,10 @@ export function Th({ className, ...p }: React.ComponentProps<'th'>) {
     <th
       {...p}
       className={cn(
-        'border-b border-line px-3 py-2 text-left text-[11px] font-semibold tracking-wide text-ink-faint uppercase whitespace-nowrap',
+        // A tinted header rule, and first/last cells that line up with the card's
+        // own px-4 padding, are what read as a considered data table rather than
+        // a bare grid of borders.
+        'border-b border-line bg-raised px-3 py-2.5 text-left text-[11px] font-semibold tracking-wide text-ink-faint uppercase whitespace-nowrap first:pl-4 last:pr-4',
         className,
       )}
     />
@@ -269,5 +281,10 @@ export function Th({ className, ...p }: React.ComponentProps<'th'>) {
 }
 
 export function Td({ className, ...p }: React.ComponentProps<'td'>) {
-  return <td {...p} className={cn('border-b border-line px-3 py-2 align-middle text-ink', className)} />
+  return (
+    <td
+      {...p}
+      className={cn('border-b border-line px-3 py-2.5 align-middle text-ink first:pl-4 last:pr-4', className)}
+    />
+  )
 }

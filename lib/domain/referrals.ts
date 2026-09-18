@@ -31,7 +31,10 @@ export type CartLine = {
 }
 
 export type Cart = {
-  event: ReferralEvent
+  /** The event this cart was last seen on. Absent when the cart came from a
+   *  live snapshot pull rather than the event log — nothing reads it, it is
+   *  kept so the synced path can carry its source event. */
+  event?: ReferralEvent
   at: string
   store: string | null
   /** The cart's value as Material Depot sent it. `null` means they did not. */

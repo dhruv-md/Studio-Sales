@@ -8,15 +8,21 @@ import {
   Badge, Button, Card, CardHead, Empty, Field, Problem, Select, Table, Td, Textarea, Th,
 } from '@/components/ui'
 import { Modal } from '@/components/ui/Modal'
-import { approveOrderAndNotify, reviewOrder, reviewPortfolio } from '@/lib/data/console-actions'
-import type { OrderWithOwner, PortfolioWithFirm } from '@/lib/data/console-queries'
+import { approveOrderAndNotify, reviewOrder, reviewPortfolio, reviewReferralPhone } from '@/lib/data/console-actions'
+import type { OrderWithOwner, PhoneWithOwner, PortfolioWithFirm } from '@/lib/data/console-queries'
 import {
   codeLabel, ORDER_NOT_COUNTED_CODES, PORTFOLIO_REJECTION_CODES, type OrderNotCounted,
 } from '@/lib/domain/reasons'
 import { date, inr } from '@/lib/format'
 import { marketLabel } from '@/lib/domain/markets'
 
-type Tab = 'orders' | 'portfolio'
+type Tab = 'orders' | 'portfolio' | 'numbers'
+
+const PHONE_LABEL: Record<PhoneWithOwner['label'], string> = {
+  client: 'Their number',
+  partner: 'Partner’s number',
+  additional: 'Additional',
+}
 
 /**
  * The admin's verification desk.
@@ -32,15 +38,19 @@ type Tab = 'orders' | 'portfolio'
 export function ApprovalQueue({
   orders,
   portfolio,
+  numbers,
   canDecide,
   ordersError,
   portfolioError,
+  numbersError,
 }: {
   orders: OrderWithOwner[]
   portfolio: PortfolioWithFirm[]
+  numbers: PhoneWithOwner[]
   canDecide: boolean
   ordersError?: string | null
   portfolioError?: string | null
+  numbersError?: string | null
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('orders')
@@ -91,6 +101,7 @@ export function ApprovalQueue({
         {([
           ['orders', `Orders (${pendingOrders.length})`],
           ['portfolio', `Portfolio (${pendingWork.length})`],
+          ['numbers', `Numbers (${numbers.length})`],
         ] as const).map(([k, label]) => (
           <button
             key={k}
@@ -215,7 +226,9 @@ export function ApprovalQueue({
             </Card>
           ) : null}
         </div>
-      ) : (
+      ) : null}
+
+      {tab === 'portfolio' ? (
         <div className="space-y-5">
           <Card>
             <CardHead
@@ -324,7 +337,69 @@ export function ApprovalQueue({
             </Card>
           ) : null}
         </div>
-      )}
+      ) : null}
+
+      {tab === 'numbers' ? (
+        <Card>
+          <CardHead
+            title="Numbers waiting to be approved"
+            hint="A number a firm linked to one of its clients. Its carts and orders do not count towards that firm until it is approved here."
+          />
+          {numbersError ? (
+            <div className="p-4"><Problem title="Numbers did not load" detail={numbersError} /></div>
+          ) : numbers.length === 0 ? (
+            <Empty title="Nothing waiting" body="Every linked number has been looked at." />
+          ) : (
+            <ul className="divide-y divide-line">
+              {numbers.map((n) => {
+                const firm = n.referral?.partner
+                return (
+                  <li key={n.id} className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-ink">
+                        <span className="tnum font-semibold">{n.phone}</span>
+                        <span className="text-ink-soft"> — linked to </span>
+                        <span className="font-medium">{n.referral?.client_name ?? 'a client'}</span>
+                        <span className="text-ink-soft"> by </span>
+                        {firm ? (
+                          <Link href={`/console/partners/${firm.id}`} className="font-medium text-brand hover:underline">
+                            {firm.firm_name}
+                          </Link>
+                        ) : (
+                          'a firm that is no longer on the platform'
+                        )}
+                      </p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-faint">
+                        <span>{PHONE_LABEL[n.label]}</span>
+                        <span>·</span>
+                        <span>added {date(n.created_at)}</span>
+                        {firm?.market ? <><span>·</span><span>{marketLabel(firm.market)}</span></> : null}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        disabled={!canDecide || pending}
+                        onClick={() => run(() => reviewReferralPhone(n.id, 'approved'))}
+                      >
+                        <Check size={13} /> Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={!canDecide || pending}
+                        onClick={() => run(() => reviewReferralPhone(n.id, 'rejected'))}
+                      >
+                        <X size={13} /> Reject
+                      </Button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Card>
+      ) : null}
 
       <Modal
         open={rejecting !== null}

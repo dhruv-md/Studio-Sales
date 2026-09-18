@@ -2,7 +2,7 @@ import { supabaseServer } from '@/lib/supabase/server'
 import { fail, ok, type Result } from './result'
 import type {
   OutreachProspect, OutreachTouch, Partner, PartnerActivity, PartnerApplication, PartnerTeamInvite,
-  PortfolioItem, Referral, ReferralEvent, ReferralOrder, RewardClaim, StaffUser,
+  PortfolioItem, Referral, ReferralEvent, ReferralOrder, ReferralPhone, RewardClaim, StaffUser,
 } from '@/lib/domain/types'
 
 /**
@@ -88,6 +88,29 @@ export const listAllOrders = (limit = 500) =>
         .order('ordered_on', { ascending: false, nullsFirst: false })
         .limit(limit),
     'referred orders',
+  )
+
+/**
+ * Numbers a firm has added to one of its clients that are waiting for a Material
+ * Depot admin to approve them. Until approved, the sync will not match a cart or
+ * order on them (008_phone_approval), so this is a money gate, not cosmetics —
+ * it sits on the Verify desk next to orders and portfolios.
+ */
+export type PhoneWithOwner = ReferralPhone & {
+  referral: (Pick<Referral, 'id' | 'client_name' | 'partner_id'> & {
+    partner: Pick<Partner, 'id' | 'firm_name' | 'market'> | null
+  }) | null
+}
+
+export const listPendingPhones = () =>
+  many<PhoneWithOwner>(
+    (sb) =>
+      sb
+        .from('referral_phone')
+        .select('*, referral:referral_id ( id, client_name, partner_id, partner:partner_id ( id, firm_name, market ) )')
+        .eq('approval_status', 'pending')
+        .order('created_at', { ascending: false }),
+    'numbers waiting for approval',
   )
 
 export const listOrdersFor = (referralIds: string[]) =>

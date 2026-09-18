@@ -685,6 +685,43 @@ async function asUser(c, uid, fn) {
       `insert into referral_phone (referral_id, phone, label) values ($1,'9812345678','additional')`, [REF_SHARMA])
   })
 
+  console.log('\n23b. The linked-number approval gate (008)')
+  // A partner-added number does not match anything until an admin approves it —
+  // otherwise a firm could add a stranger's number and be paid for that
+  // stranger's orders. The gate is the column plus the insert trigger plus
+  // review_referral_phone(), and no UPDATE policy for anybody.
+  await c.query('begin')
+  const gate = await c.query(
+    `insert into referral_phone (referral_id, phone, label) values ($1,'9820011111','additional')
+     returning id, approval_status`, [REF_SHARMA])
+  check('a number added lands pending, not approved', gate.rows[0].approval_status === 'pending',
+    gate.rows[0].approval_status)
+  const gateId = gate.rows[0].id
+  await c.query('commit')
+
+  await asUser(c, DEMO_UID, async () => {
+    const sneaky = await c.query(
+      `insert into referral_phone (referral_id, phone, label, approval_status)
+       values ($1,'9820022222','additional','approved') returning approval_status`, [REF_SHARMA])
+    check('a partner cannot self-approve on insert — the trigger forces pending',
+      sneaky.rows[0].approval_status === 'pending', sneaky.rows[0].approval_status)
+    const upd = await c.query("update referral_phone set approval_status='approved' where id=$1", [gateId])
+    check('a partner cannot update approval_status — no policy', upd.rowCount === 0, `${upd.rowCount} rows`)
+    await blocked('a partner cannot call review_referral_phone()',
+      'select review_referral_phone($1,$2)', [gateId, 'approved'])
+  })
+  await asUser(c, KAM_BLR_UID, async () => {
+    await blocked('a KAM cannot approve a number either',
+      'select review_referral_phone($1,$2)', [gateId, 'approved'])
+  })
+  await asUser(c, ADMIN_UID, async () => {
+    await c.query('select review_referral_phone($1,$2)', [gateId, 'approved'])
+    const { rows } = await c.query('select approval_status, approved_by from referral_phone where id=$1', [gateId])
+    check('an admin can, and it stamps who did it',
+      rows[0].approval_status === 'approved' && rows[0].approved_by === ADMIN_UID)
+  })
+  await c.query('delete from referral_phone where id=$1', [gateId])
+
   console.log('\n24. Scheduling a store visit (007)')
   let visitId
   await c.query('begin')

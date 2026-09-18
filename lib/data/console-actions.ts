@@ -132,6 +132,23 @@ export async function approveOrderAndNotify(
 
 // ================================================================ portfolio
 
+/**
+ * Approve or reject a number a partner linked to one of their clients. Goes
+ * through `review_referral_phone()`, which re-checks `app_is_admin()` inside
+ * Postgres — `referral_phone` has no UPDATE policy, so this function is the only
+ * thing that can move the column, and an app-layer slip cannot approve a number.
+ */
+export async function reviewReferralPhone(id: string, status: 'approved' | 'rejected') {
+  const staff = await requireStaff(['admin'])
+  if (!staff.ok) return staff
+
+  const sb = await supabaseServer()
+  const { error } = await sb.rpc('review_referral_phone', { p_id: id, p_status: status })
+  if (error) return fail(`Could not save that decision: ${error.message}`)
+  revalidatePath('/console/approvals')
+  return ok(true)
+}
+
 export async function reviewPortfolio(itemId: string, status: PortfolioStatus, note?: string | null) {
   const staff = await requireStaff(['admin'])
   if (!staff.ok) return staff

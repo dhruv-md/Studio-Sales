@@ -1,28 +1,29 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, CalendarPlus, Plus, Search, Trash2, UserPlus } from 'lucide-react'
+import { ArrowLeft, CalendarPlus, Plus, RefreshCw, Search, Trash2, UserPlus } from 'lucide-react'
 import type {
-  Escalation, EscalationComment, Referral, ReferralEvent, ReferralPhone, VisitRequest,
+  Referral, ReferralEvent, ReferralPhone, VisitRequest,
 } from '@/lib/domain/types'
 import {
   Button, Card, CardHead, Empty, Input, Problem, Select, Table, Td, Th,
 } from '@/components/ui'
 import { Modal } from '@/components/ui/Modal'
 import { ReferralFeed } from './ReferralFeed'
-import { CartPanel } from './CartPanel'
 import { ReferClientForm } from './ReferClientForm'
 import { ScheduleVisitForm } from './ScheduleVisitForm'
 import { VisitLog } from './VisitLog'
 import { NumbersPanel } from './NumbersPanel'
+import { LiveCart } from './LiveCart'
 import { MaskedPhone } from './MaskedPhone'
 import { ClientOrders, OrdersFooter } from './ClientOrders'
-import { Escalations } from './Escalations'
+import { OrderList, VisitList } from '@/components/snapshot/Sections'
 import { summariseClients } from '@/lib/domain/referrals'
 import { standing, type LedgerOrder } from '@/lib/domain/ledger'
 import { GO_LIVE } from '@/lib/domain/programme'
-import { deleteReferral } from '@/lib/data/actions'
+import { clientCartOrderSnapshot, deleteReferral } from '@/lib/data/actions'
+import type { SnapshotResult } from '@/lib/data/snapshot'
 import { EV, track } from '@/lib/analytics/track'
 import { date, inr, inrShort, relative } from '@/lib/format'
 
@@ -37,7 +38,7 @@ import { date, inr, inrShort, relative } from '@/lib/format'
  */
 export function ReferralsView({
   referrals, events, orders, eventsError, initialOpenId, openNew,
-  escalations, escalationComments, escalationsError, visits, visitsError, phones, phonesError, today,
+  visits, visitsError, phones, phonesError, today,
 }: {
   referrals: Referral[]
   events: ReferralEvent[]
@@ -47,9 +48,6 @@ export function ReferralsView({
   initialOpenId?: string | null
   /** `?new=1`, so a call to action anywhere can open the form. */
   openNew?: boolean
-  escalations: Escalation[]
-  escalationComments: EscalationComment[]
-  escalationsError?: string | null
   visits: VisitRequest[]
   visitsError?: string | null
   phones: ReferralPhone[]
@@ -62,6 +60,39 @@ export function ReferralsView({
   const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null)
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
+
+  // The live cart + order pull for the open client. Lifted here (rather than
+  // living inside NumbersPanel) so its orders can land in this client's "What
+  // they have bought" card, not in a separate live-orders section. Cleared
+  // whenever a different client is opened.
+  const [snap, setSnap] = useState<SnapshotResult[] | null>(null)
+  const [snapError, setSnapError] = useState<string | null>(null)
+  const [snapPending, startSnap] = useTransition()
+
+  function pullSnapshot(referralId: string) {
+    setSnapError(null)
+    startSnap(async () => {
+      const res = await clientCartOrderSnapshot(referralId)
+      if (!res.ok) {
+        setSnap(null)
+        return setSnapError(res.error)
+      }
+      setSnap(res.data)
+    })
+  }
+
+  // Auto-pull when a client is opened, so the live cart, orders and visits are
+  // there without a click. The ref keeps it to one fetch per open — it does not
+  // re-fire on every render, and React's dev double-mount does not double-hit
+  // the external API. The Refresh button calls pullSnapshot directly to re-pull.
+  const autoPulledFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (openId && autoPulledFor.current !== openId) {
+      autoPulledFor.current = openId
+      pullSnapshot(openId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId])
   // §9.1's filters, search and sort.
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<'last_activity' | 'value' | 'referred'>('last_activity')
@@ -88,6 +119,9 @@ export function ReferralsView({
    */
   function openClient(id: string | null) {
     setOpenId(id)
+    // Live data belongs to one client — never carry it across to the next.
+    setSnap(null)
+    setSnapError(null)
     if (typeof window === 'undefined') return
     const url = new URL(window.location.href)
     if (id) url.searchParams.set('client', id)
@@ -132,50 +166,68 @@ export function ReferralsView({
     const s = stats.get(open.id)
     const mine = s?.events ?? []
     const myOrders = (s?.orders ?? []) as LedgerOrder[]
-    const myEscalations = escalations.filter((e) => e.referral_id === open.id)
     const counted = myOrders.filter((o) => standing(o, today, GO_LIVE).state === 'counted')
     const countedValue = counted.reduce((sum, o) => sum + (Number(o.order_value) || 0), 0)
+    // Every live order across this client's linked numbers, pulled on demand,
+    // each tagged with the number it belongs to so the aggregated list stays
+    // legible (a pill shows the number per row).
+    const liveOrders = (snap ?? []).flatMap((r) =>
+      (r.orders?.items ?? []).map((order) => ({ order, phone: r.phone_number })),
+    )
+    // Live store visits across the client's numbers, tagged the same way.
+    const liveVisits = (snap ?? []).flatMap((r) =>
+      (r.visits?.items ?? []).map((visit) => ({ visit, phone: r.phone_number })),
+    )
 
     return (
       <>
-        <button
-          onClick={() => openClient(null)}
-          className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft transition hover:text-brand"
-        >
-          <ArrowLeft size={14} /> All clients
-        </button>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <button
+            onClick={() => openClient(null)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft transition hover:text-brand"
+          >
+            <ArrowLeft size={14} /> All clients
+          </button>
+          <Button size="sm" variant="secondary" onClick={() => pullSnapshot(open.id)} disabled={snapPending}>
+            <RefreshCw size={13} className={snapPending ? 'animate-spin' : undefined} />
+            {snapPending ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        </div>
 
         <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
           <div className="space-y-5">
             <Card>
-              <CardHead
-                title={open.client_name}
-                hint={
-                  <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <MaskedPhone referralId={open.id} phone={open.md_phone} surface="client_detail" />
-                    <span>· referred {date(open.referred_on)}</span>
-                    {open.city || open.locality ? <span>· {[open.locality, open.city].filter(Boolean).join(', ')}</span> : null}
-                    {open.attribution_expires_on ? (
-                      <span>· credited to you until {date(open.attribution_expires_on)}</span>
-                    ) : null}
+              <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3.5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-soft font-display text-lg font-semibold text-brand ring-1 ring-brand-line ring-inset">
+                    {open.client_name.trim().charAt(0).toUpperCase() || '—'}
                   </span>
-                }
-                action={
-                  <div className="flex items-center gap-1.5">
-                    <Button size="sm" onClick={() => setSchedulingVisit(true)}>
-                      <CalendarPlus size={13} /> Schedule another visit
-                    </Button>
-                    <button
-                      onClick={() => remove(open.id)}
-                      disabled={pending}
-                      className="rounded-md p-1.5 text-ink-faint transition hover:bg-bad-soft hover:text-bad"
-                      title="Remove this referral"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                  <div className="min-w-0">
+                    <h2 className="font-display text-lg font-semibold tracking-tight text-ink">{open.client_name}</h2>
+                    <p className="mt-0.5 inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint">
+                      <MaskedPhone referralId={open.id} phone={open.md_phone} surface="client_detail" />
+                      <span>· referred {date(open.referred_on)}</span>
+                      {open.city || open.locality ? <span>· {[open.locality, open.city].filter(Boolean).join(', ')}</span> : null}
+                      {open.attribution_expires_on ? (
+                        <span>· credited to you until {date(open.attribution_expires_on)}</span>
+                      ) : null}
+                    </p>
                   </div>
-                }
-              />
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <Button size="sm" onClick={() => setSchedulingVisit(true)}>
+                    <CalendarPlus size={13} /> Schedule another visit
+                  </Button>
+                  <button
+                    onClick={() => remove(open.id)}
+                    disabled={pending}
+                    className="rounded-md p-1.5 text-ink-faint transition hover:bg-bad-soft hover:text-bad"
+                    title="Remove this referral"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
               <ReferralFeed
                 events={mine}
                 names={names}
@@ -189,21 +241,49 @@ export function ReferralsView({
                 title="What they have bought"
                 hint="Every order, and what each one is doing for your rewards"
               />
-              <ClientOrders orders={myOrders} today={today} />
+              {/* Its "No orders yet" empty state must not show when there are
+                  live orders below — that would have the card deny and list
+                  orders at once. Render the attributed table when there is one,
+                  or the empty state only when there is nothing live either. */}
+              {myOrders.length || !liveOrders.length ? (
+                <ClientOrders orders={myOrders} today={today} />
+              ) : null}
               <OrdersFooter orders={myOrders} today={today} goLive={GO_LIVE} />
               <div className="flex items-center justify-between border-t border-line px-4 py-2.5">
                 <span className="text-xs font-medium text-ink-soft">Counting towards your rewards</span>
                 <span className="tnum text-sm font-semibold text-good">{inr(countedValue)}</span>
               </div>
+              {liveOrders.length ? (
+                <div className="border-t border-line px-4 py-3">
+                  {/* Live from Material Depot, across every linked number. Kept
+                      visually apart from the table above because these carry no
+                      attribution or maturation yet — they have not been verified
+                      into the rewards ledger, and showing them as if they had
+                      would misstate what is counting. */}
+                  <p className="mb-2 text-[11px] font-medium tracking-wide text-ink-faint uppercase">
+                    Live from Material Depot
+                  </p>
+                  <OrderList orders={liveOrders} />
+                </div>
+              ) : null}
             </Card>
 
-            <Escalations
-              escalations={myEscalations}
-              comments={escalationComments}
-              orders={myOrders}
-              referralId={open.id}
-              error={escalationsError}
-            />
+            <Card>
+              <CardHead
+                title="Live cart"
+                hint="Pulled live from Material Depot — pick a number to see its cart"
+              />
+              {snapError ? (
+                <div className="px-4 py-3"><Problem title="Live lookup failed" detail={snapError} /></div>
+              ) : snap ? (
+                <LiveCart results={snap} />
+              ) : snapPending ? (
+                <p className="px-4 py-4 text-xs text-ink-faint">Checking Material Depot…</p>
+              ) : (
+                <p className="px-4 py-4 text-xs text-ink-faint">Use Refresh at the top to load the live cart.</p>
+              )}
+            </Card>
+
           </div>
 
           <div className="space-y-4">
@@ -212,7 +292,22 @@ export function ReferralsView({
               {visitsError ? (
                 <div className="px-4 py-3"><Problem title="Visits could not be loaded" detail={visitsError} /></div>
               ) : (
-                <VisitLog visits={visits.filter((v) => v.referral_id === open.id)} />
+                <>
+                  {/* Suppress VisitLog's "No visits" empty state when live visits
+                      are present — otherwise the card denies and lists visits at
+                      once, the same trap the orders card had. */}
+                  {visits.some((v) => v.referral_id === open.id) || !liveVisits.length ? (
+                    <VisitLog visits={visits.filter((v) => v.referral_id === open.id)} />
+                  ) : null}
+                  {liveVisits.length ? (
+                    <div className="border-t border-line px-4 py-3">
+                      <p className="mb-2 text-[11px] font-medium tracking-wide text-ink-faint uppercase">
+                        Live from Material Depot
+                      </p>
+                      <VisitList visits={liveVisits} />
+                    </div>
+                  ) : null}
+                </>
               )}
             </Card>
 
@@ -223,11 +318,6 @@ export function ReferralsView({
               ) : (
                 <NumbersPanel referralId={open.id} phones={phones.filter((p) => p.referral_id === open.id)} />
               )}
-            </Card>
-
-            <Card>
-              <CardHead title="In their cart" hint="The last cart we saw at a Material Depot store" />
-              <CartPanel cart={s?.cart ?? { state: 'none' }} />
             </Card>
 
             {open.project_type || open.budget_band || open.timeline || open.categories?.length ? (

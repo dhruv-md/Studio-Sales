@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   Award, Building2, ClipboardCheck, FolderKanban, GalleryVerticalEnd, LayoutDashboard,
-  Layers, Palette, PhoneCall, Settings, ShieldCheck, UserPlus, Users, UsersRound,
+  Layers, Palette, PackageSearch, PhoneCall, Settings, ShieldCheck, UserPlus, Users, UsersRound,
 } from 'lucide-react'
 import type { Partner, StaffRole } from '@/lib/domain/types'
 
@@ -75,6 +75,7 @@ const CONSOLE: Record<StaffRole, NavItem[]> = {
     { href: '/console/approvals', label: 'Verify', icon: ShieldCheck, blurb: 'Orders and portfolios' },
     { href: '/console/applications', label: 'Onboarding', icon: UserPlus, blurb: 'Forms, and issuing logins' },
     { href: '/console/partners', label: 'Firms', icon: Building2, blurb: 'Everyone on the platform' },
+    { href: '/console/snapshot', label: 'Cart lookup', icon: PackageSearch, blurb: 'A customer’s cart and orders' },
     { href: '/console/prospects', label: 'Outreach', icon: PhoneCall, blurb: 'Firms we are talking to' },
     { href: '/console/staff', label: 'Team', icon: UsersRound, blurb: 'Who does what, where' },
     { href: '/console/settings', label: 'Settings', icon: Settings, blurb: 'Your account and password' },
@@ -82,6 +83,7 @@ const CONSOLE: Record<StaffRole, NavItem[]> = {
   kam: [
     { href: '/console', label: 'Today', icon: LayoutDashboard, blurb: 'What is waiting on you' },
     { href: '/console/partners', label: 'My firms', icon: Building2, blurb: 'The firms you look after' },
+    { href: '/console/snapshot', label: 'Cart lookup', icon: PackageSearch, blurb: 'A customer’s cart and orders' },
     { href: '/console/approvals', label: 'Orders', icon: ClipboardCheck, blurb: 'What is waiting on an admin' },
     { href: '/console/settings', label: 'Settings', icon: Settings, blurb: 'Your account and password' },
   ],

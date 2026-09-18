@@ -26,8 +26,20 @@ export default async function proxy(req: NextRequest) {
     },
   )
 
-  const { data } = await supabase.auth.getUser()
-  const signedIn = Boolean(data.user)
+  // getSession(), NOT getUser(), on purpose — this runs on EVERY request, and
+  // getUser() makes a network round-trip to the auth server to re-validate the
+  // token every time, which adds ~100–300ms to the front of every navigation
+  // and every server action against the remote project. getSession() reads the
+  // token locally and only networks when it has to refresh an expired one, so
+  // the common case pays nothing.
+  //
+  // Safe because this is a UX gate, not the security boundary: it only decides
+  // signed-in-vs-/login and refreshes the cookie. Real authorisation is RLS on
+  // every table plus the layout's currentActor(), which still calls getUser().
+  // A stale-but-unexpired token at worst shows the app shell for a moment before
+  // those catch it — it can read nothing it shouldn't.
+  const { data } = await supabase.auth.getSession()
+  const signedIn = Boolean(data.session)
   const path = req.nextUrl.pathname
 
   // /p/<token> is the public, unauthenticated presentation page for a shared
