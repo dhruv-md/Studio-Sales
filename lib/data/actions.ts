@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { supabaseServer } from '@/lib/supabase/server'
 import { fail, ok, type Result } from './result'
+import { fetchSnapshot, MAX_NUMBERS, type SnapshotResult } from './snapshot'
 import { phone10 } from '@/lib/format'
 import type { CatalogPick } from '@/lib/catalog/types'
 import type { Referral, StudioProject, StudioProjectSpace } from '@/lib/domain/types'
@@ -657,6 +658,50 @@ export async function addReferralPhone(referralId: string, phone: string, label:
 
 export async function removeReferralPhone(id: string) {
   return remove('referral_phone', id, 'this number', '/referrals')
+}
+
+/**
+ * The live cart + order snapshot for every number linked to one client.
+ *
+ * Partner-safe by construction: the caller passes a referral id, NOT phone
+ * numbers. RLS on `referral` and `referral_phone` means a partner only ever
+ * resolves their own client's numbers here — there is no way to hand this an
+ * arbitrary number and read a stranger, which is exactly why the raw snapshot
+ * endpoint stays staff-only and the numbers are gathered server-side instead.
+ *
+ * The number the client was referred on plus every linked number, de-duplicated
+ * and capped at ten (the service's own limit).
+ */
+export async function clientCartOrderSnapshot(referralId: string): Promise<Result<SnapshotResult[]>> {
+  const sb = await supabaseServer()
+
+  const { data: ref, error: refErr } = await sb
+    .from('referral')
+    .select('id, md_phone')
+    .eq('id', referralId)
+    .maybeSingle()
+  if (refErr) return fail(`Could not load this client: ${refErr.message}`)
+  if (!ref) return fail('This client could not be found.')
+
+  // Only approved linked numbers are looked up — a pending number is not yet a
+  // number this client is allowed to be matched on (008_phone_approval).
+  const { data: extra, error: extraErr } = await sb
+    .from('referral_phone')
+    .select('phone')
+    .eq('referral_id', referralId)
+    .eq('approval_status', 'approved')
+  if (extraErr) return fail(`Could not load this client’s numbers: ${extraErr.message}`)
+
+  const phones = new Set<string>()
+  const primary = phone10((ref as { md_phone: string }).md_phone)
+  if (primary) phones.add(primary)
+  for (const p of (extra ?? []) as { phone: string }[]) {
+    const n = phone10(p.phone)
+    if (n) phones.add(n)
+  }
+  if (!phones.size) return fail('This client has no valid phone number on file.')
+
+  return fetchSnapshot([...phones].slice(0, MAX_NUMBERS).map(Number))
 }
 
 /**

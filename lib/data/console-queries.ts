@@ -90,25 +90,27 @@ export const listAllOrders = (limit = 500) =>
     'referred orders',
   )
 
+/**
+ * Numbers a firm has added to one of its clients that are waiting for a Material
+ * Depot admin to approve them. Until approved, the sync will not match a cart or
+ * order on them (008_phone_approval), so this is a money gate, not cosmetics —
+ * it sits on the Verify desk next to orders and portfolios.
+ */
 export type PhoneWithOwner = ReferralPhone & {
-  referral: (Pick<Referral, 'id' | 'client_name' | 'md_phone' | 'partner_id'> & {
+  referral: (Pick<Referral, 'id' | 'client_name' | 'partner_id'> & {
     partner: Pick<Partner, 'id' | 'firm_name' | 'market'> | null
   }) | null
 }
 
-/** 008_phone_review.sql — every number a firm has ever linked to a client,
- *  `pending` first. `client`-label rows never appear `pending` (they are
- *  forced `approved` at insert), so this queue is only ever `partner`/
- *  `additional` numbers a firm typed in themselves. */
-export const listAllPhones = (limit = 500) =>
+export const listPendingPhones = () =>
   many<PhoneWithOwner>(
     (sb) =>
       sb
         .from('referral_phone')
-        .select('*, referral:referral_id ( id, client_name, md_phone, partner_id, partner:partner_id ( id, firm_name, market ) )')
-        .order('created_at', { ascending: false })
-        .limit(limit),
-    'linked numbers',
+        .select('*, referral:referral_id ( id, client_name, partner_id, partner:partner_id ( id, firm_name, market ) )')
+        .eq('approval_status', 'pending')
+        .order('created_at', { ascending: false }),
+    'numbers waiting for approval',
   )
 
 export const listOrdersFor = (referralIds: string[]) =>

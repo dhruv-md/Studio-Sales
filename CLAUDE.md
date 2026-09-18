@@ -51,7 +51,7 @@ cd supabase/test && npm install && npm run all   # the SQL + RLS suite
 There is no lint command. The gate is `npm run typecheck`, `npm run build`,
 `npm run test:domain`, and — for anything touching `supabase/` — the suite in
 `supabase/test`, which runs the migrations and both seeds against a throwaway
-Postgres 18 and asserts **215** things about RLS. **Run all four before claiming
+Postgres 18 and asserts **221** things about RLS. **Run all four before claiming
 a change works.**
 
 And then look at it. Every one of the twenty-two bugs in `docs/landmines.md` passed
@@ -142,6 +142,7 @@ skip that.
 | `app/api/sync/referrals` | Push endpoint for referral events and orders. Service-role, shared-secret. |
 | `app/api/sync/outbox`, `app/api/sync/visit-assignment` | The other direction — new referrals/visits out to the CRM, and a BM assignment back in. `docs/kam-bridge.md`. |
 | `app/api/upload` | The only door into the `studio-media` Storage bucket — checks the caller's session, then writes with the service role. |
+| `app/api/tools/cart-order-snapshot` | Staff-only proxy to Material Depot's user cart+order snapshot API. Holds `MD_SNAPSHOT_API_KEY` server-side (the upstream has no per-user auth), gates with `requireStaff`. Feeds `/console/snapshot`. |
 | `app/(app)/orders` | Order tracking across every referred client — not a nav item, reached from Overview's "Live orders" panel. `docs/orders.md`. |
 | `app/p/**` | Public, unauthenticated presentation pages for a shared Project or Space — `proxy.ts` exempts this path from the sign-in gate. |
 | `lib/domain/**` | The rules, and no I/O. Money, quantity, areas, markets, the internal tiering and the per-client rollup — plus the incentive programme: `slabs.ts` (the §10 ladders), `ledger.ts` (attribution, maturation, the statement), `periods.ts` (calendar months in string space), `programme.ts` (**every §17 default, in one file**), `privacy.ts` (§14.5), `reasons.ts` (Appendix B), `theme.ts` (§13.3 + the AA gate). |
@@ -155,7 +156,7 @@ skip that.
 | `supabase/migrations/**` | The schema and the RLS policies. Pasted by hand. |
 | `supabase/seed/001_demo.sql` | A whole demo firm — 5 projects, boards, quotes, procurement, ledger, referrals, rewards. Idempotent. |
 | `supabase/seed/002_console.sql` | The demo B2B team, two more firms, prospects, onboarding forms, portfolios, activity. |
-| `supabase/test/**` | Migrations + seeds + 215 RLS assertions against a throwaway Postgres. Its deps are deliberately outside the app's `package.json`. |
+| `supabase/test/**` | Migrations + seeds + 221 RLS assertions against a throwaway Postgres. Its deps are deliberately outside the app's `package.json`. |
 
 ## House rules
 
@@ -286,7 +287,7 @@ Module detail lives in `docs/`, read on demand:
 | `docs/kam-bridge.md` | The outbox that reflects a new referral/visit into the CRM's KAM tab — built here, nothing on the CRM side yet |
 | `docs/open-questions.md` | What is decided by default and needs a human to confirm |
 | `docs/landmines.md` | **Twenty-two bugs already shipped or caught here**, kept because the shape of each recurs. Read before trusting a passing build. |
-| `supabase/test/README.md` | What the 215 assertions cover, the `blocked()` vs `unchanged()` distinction, and the two shim details that are load-bearing |
+| `supabase/test/README.md` | What the 221 assertions cover, the `blocked()` vs `unchanged()` distinction, and the two shim details that are load-bearing |
 
 **When you change behaviour a doc describes, update that doc in the same
 commit.** A doc describing last month's behaviour is worse than no doc, because
@@ -341,6 +342,7 @@ Four more are **optional and unset**, and the app is correct without them:
 | `NEXT_PUBLIC_B2B_DESK_PHONE` / `_EMAIL` / `_HOURS` | `KamCard`'s fallback when a firm has no KAM assigned (§13.5) | The card says any store can help, rather than printing a desk number. **Deliberate** — an invented number in a live partner app means a partner rings a stranger and concludes the whole product is fake. Set these when the desk exists. |
 | `NEXT_PUBLIC_APP_VERSION` | `app_version` on every analytics event (§14.6.3) | `'dev'`. Harmless until a vendor is connected, at which point every event from production would be stamped `dev`. |
 | `CREDENTIAL_KEY` | The seal on a retained password (`lib/auth/credentials.ts`) | The key is derived from `SUPABASE_SERVICE_ROLE_KEY` instead, so nothing breaks. **Set it before ever rotating that key**: rotation changes the derived key and every password sealed under the old one then reads `unreadable` — honestly labelled, but no longer recoverable. |
+| `MD_SNAPSHOT_API_KEY` / `_BASE` | The `/console/snapshot` cart+order lookup, via `app/api/tools/cart-order-snapshot` | The route returns **503 naming the variable** rather than calling the upstream, and the tool shows that on screen. The whole feature is dark until the backend team hands over the key; the rest of the console is unaffected. |
 
 There is **no Mixpanel token and no Clarity id**, on purpose — `docs/analytics.md`
 has why, and what adding one costs (one function, one file).

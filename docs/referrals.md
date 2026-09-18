@@ -299,30 +299,34 @@ linked to a referral, seeded with the original `md_phone` as a `'client'` row;
 ones it added, but never the original.
 
 `POST /api/sync/referrals`'s phone resolution reads both sources — a hit on
-`referral.md_phone` OR on an **approved** `referral_phone` row counts,
-deduplicated by referral id so a phone matching a referral on both is one
-match, not two. The `ambiguous` rule is unchanged: two DIFFERENT referrals
-both claiming a phone, across either source, is still reported and skipped
-rather than guessed.
+`referral.md_phone` OR on any **approved** `referral_phone` row counts,
+deduplicated by referral id so a phone matching a referral on both is one match,
+not two. The `ambiguous` rule is unchanged: two DIFFERENT referrals both claiming
+a phone, across either source, is still reported and skipped rather than guessed.
 
-### A firm-added number is approved before it counts (008_phone_review.sql)
+### A number a firm adds must be approved first — 008_phone_approval
 
-The same reasoning as the order gate below: a number is how money gets
-attributed, so a firm typing one in does not make it live immediately. Every
-`referral_phone` row a firm inserts (`'partner'` or `'additional'`) arrives
-`status = 'pending'` and is invisible to the sync's matching above until a
-Material Depot admin approves it in `/console/approvals`'s Numbers tab —
-`review_referral_phone()`, the same SECURITY DEFINER shape as
-`review_referral_order()` below, and `referral_phone` has no UPDATE policy for
-anybody either. The `'client'` row is the one exception: it is the number the
-referral itself was made on, already trusted, and a trigger forces it
-`approved` regardless of what arrives with it.
+A firm typing a number into `NumbersPanel` could otherwise add a *stranger's*
+number and have the sync attribute that stranger's orders to it. So an added
+number is a **money gate**, and — like the order gate — it lives in the database:
 
-`NumbersPanel` shows the state on the number itself — "Awaiting approval" or
-"Not approved" — rather than pretending every linked number already counts.
-Every row that existed before this migration was pasted, plus every `'client'`
-row from then on, is grandfathered/forced `approved`; the gate is for what a
-firm adds from here, not a retroactive freeze on numbers already relied on.
+- `referral_phone.approval_status` is `pending | approved | rejected`. A partner
+  adds → `pending`; the primary `'client'` number (and anything an admin adds) is
+  `approved` at once. An insert **trigger** (`referral_phone_gate`) forces the
+  value regardless of what the client POSTed, so a partner cannot self-approve on
+  insert, and there is **no UPDATE policy** on the table for anybody.
+- `review_referral_phone(id, status)` is the only way to move it, and it re-checks
+  `app_is_admin()` inside Postgres. `reviewReferralPhone()` in `console-actions.ts`
+  calls it; the **Numbers** tab on `/console/approvals` is where an admin does so.
+- Only `approved` numbers are matched — by the sync (above) and by the live pull
+  (`clientCartOrderSnapshot`). The primary `md_phone` is trusted directly (it came
+  off the referral form through the §9.2 duplicate check), so the filter never
+  loses it. Existing rows were grandfathered to `approved` on migration.
+- The partner sees a **Pending approval** / **Rejected** badge on the number in
+  `NumbersPanel` until an admin decides.
+
+`supabase/test/rlstest.js` group 23b asserts the whole gate: added-lands-pending,
+no self-approve on insert, no UPDATE, partner/KAM refused, admin approves.
 
 ## Reason codes — PRD Appendix B
 
@@ -356,3 +360,54 @@ On a client's own page, the referral is matched by `client_id` first and exact
 `phone` second — **never by name**. Two clients called Sharma are not one
 person, and showing one client another's store visits would be worse than
 showing nothing.
+
+## Live cart & order snapshot (linked numbers)
+
+Opening a client asks Material Depot, live, what is in each of that client's
+numbers' carts right now, what they have ordered and their store visits — the
+same `/apiV1/user-cart-order-snapshot/` service the staff console tool uses
+(`docs` note in `CLAUDE.md` under `app/api/tools/…`). The pull is **automatic on
+open** (`ReferralsView` fires it once per client via an effect guarded by a ref,
+so a render or React's dev double-mount does not re-hit the API) and can be
+re-run with the **Refresh** button at the top of the client.
+
+The one rule that shapes it: **the partner sends a referral id, never a phone
+number.** `clientCartOrderSnapshot(referralId)` (`lib/data/actions.ts`) resolves
+`referral.md_phone` plus every `referral_phone` row *behind RLS* — a partner can
+only ever resolve their own client's numbers — then calls `fetchSnapshot()`.
+That is why the raw endpoint stays staff-only: it has no per-user auth, so
+handing a partner a proxy where they could type an arbitrary number would let
+them read a stranger's cart. Gathering the numbers server-side removes the input
+that would make that possible.
+
+The fetch is owned by `ReferralsView` (so its one result set reaches every card)
+and splits by kind:
+
+- **Cart** — its own **Live cart** card (`components/referrals/LiveCart.tsx`),
+  with a dropdown to pick which linked number's cart to show (a cart belongs to a
+  number, so one at a time rather than a stack). It is not a new cart UI:
+  `snapshotCartToState()` (`components/snapshot/Sections.tsx`) maps the snapshot
+  cart onto the domain `CartState` and the existing `CartPanel` draws it. A live
+  active cart is an `open` cart (the service never says an order followed); its
+  value is derived from the lines and its "last updated" from the newest line
+  stamp, so nothing is invented. The card sits in the left column directly below
+  **What they have bought**. (The older synced "In their cart" card — the last
+  cart seen in the event log — was removed in favour of this live one.)
+- **Orders** — every live order across the client's numbers is aggregated into
+  the existing **What they have bought** card (via `OrderList`), under a "Live
+  from Material Depot" divider. It sits apart from the attributed table above it
+  because a live order carries **no attribution or maturation** — it has not been
+  verified into the rewards ledger, and rendering it in the rewards-shaped
+  `ClientOrders` table would misstate what is counting.
+- **Visits** — live store visits are aggregated into the existing **Visits** card
+  (via `VisitList`), same "Live from Material Depot" divider below the synced
+  `VisitLog`. Each row carries the `bm_assigned` status the feed provides.
+
+Each aggregated row (order or visit) carries a **phone pill** naming the number
+it came in on, so a client with several linked numbers stays legible. Both the
+orders and visits cards suppress their own "nothing yet" empty state when live
+rows are present — otherwise the card would deny and list rows at once.
+
+The shared pieces live outside `console/` for the same reason `account/` does —
+both apps import them. `MD_SNAPSHOT_API_KEY` unset ⇒ the button returns a
+readable "not configured" failure, never a silent empty list.

@@ -278,8 +278,6 @@ export type Referral = {
   pushed_at?: string | null
 }
 
-export type PhoneApproval = 'pending' | 'approved' | 'rejected'
-
 /** 007_studio_v2.sql — every number this client is known to place orders
  *  through, not just `referral.md_phone`. Cart/order matching reads only the
  *  `approved` ones (008_phone_review.sql) — a number a firm just added sits
@@ -292,10 +290,10 @@ export type ReferralPhone = {
   label: 'partner' | 'client' | 'additional'
   added_by: string | null
   created_at: string
-  status: PhoneApproval
-  reviewed_by: string | null
-  reviewed_at: string | null
-  review_note: string | null
+  /** A number a partner adds is `pending` until a Material Depot admin approves
+   *  it — only an approved number is matched by the sync and the live pull. The
+   *  primary 'client' number is `approved` from the start (008_phone_approval). */
+  approval_status: 'pending' | 'approved' | 'rejected'
 }
 
 export type VisitRequestStatus = 'requested' | 'bm_assigned' | 'completed' | 'cancelled'

@@ -1,12 +1,12 @@
 import { requireStaff } from '@/lib/data/session'
-import { listAllOrders, listAllPhones, listPortfolioQueue } from '@/lib/data/console-queries'
+import { listAllOrders, listPendingPhones, listPortfolioQueue } from '@/lib/data/console-queries'
 import { ApprovalQueue } from '@/components/console/ApprovalQueue'
 import { PageHead } from '@/components/shell/PageHead'
 import { Problem } from '@/components/ui'
 
 export default async function ApprovalsPage() {
-  const [staff, orders, portfolio, phones] = await Promise.all([
-    requireStaff(), listAllOrders(), listPortfolioQueue(), listAllPhones(),
+  const [staff, orders, portfolio, numbers] = await Promise.all([
+    requireStaff(), listAllOrders(), listPortfolioQueue(), listPendingPhones(),
   ])
 
   if (!staff.ok) {
@@ -28,11 +28,11 @@ export default async function ApprovalsPage() {
         <ApprovalQueue
           orders={orders.ok ? orders.data : []}
           portfolio={portfolio.ok ? portfolio.data : []}
-          phones={phones.ok ? phones.data : []}
+          numbers={numbers.ok ? numbers.data : []}
           canDecide={staff.data.role === 'admin'}
           ordersError={orders.ok ? null : orders.error}
           portfolioError={portfolio.ok ? null : portfolio.error}
-          phonesError={phones.ok ? null : phones.error}
+          numbersError={numbers.ok ? null : numbers.error}
         />
       </div>
     </>

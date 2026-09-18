@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import {
-  listEscalationComments, listEscalations, listReferralEvents, listReferralOrders, listReferralPhones,
+  listEscalations, listReferralEvents, listReferralOrders, listReferralPhones,
   listReferrals, listVisitRequests,
 } from '@/lib/data/queries'
 import { ReferralsView } from '@/components/referrals/ReferralsView'
@@ -52,12 +52,10 @@ export default async function ReferralsPage({
     listReferralPhones(ids),
   ])
 
-  const comments = escalations.ok
-    ? await listEscalationComments(escalations.data.map((e) => e.id))
-    : { ok: true as const, data: [] }
-
   // An open escalation holds an order's maturation (§10.5). A failed read is
-  // NOT counted as zero — see the note on the Rewards page.
+  // NOT counted as zero — see the note on the Rewards page. The escalations are
+  // still fetched for this even though the Clients screen no longer shows an
+  // escalations card, because a held order must still read as held.
   const openByOrder = new Map<string, number>()
   if (escalations.ok) {
     for (const e of escalations.data) {
@@ -128,9 +126,6 @@ export default async function ReferralsPage({
           eventsError={events.ok ? null : events.error}
           initialOpenId={client ?? null}
           openNew={openNew === '1'}
-          escalations={escalations.ok ? escalations.data : []}
-          escalationComments={comments.ok ? comments.data : []}
-          escalationsError={escalations.ok ? null : escalations.error}
           visits={visits.ok ? visits.data : []}
           visitsError={visits.ok ? null : visits.error}
           phones={phones.ok ? phones.data : []}

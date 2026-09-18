@@ -142,10 +142,15 @@ export async function POST(req: Request) {
   }
 
   const referralById = new Map((referrals ?? []).map((r) => [r.id, r]))
+  // Only APPROVED linked numbers attribute anything. A number a firm added is
+  // pending until an admin approves it (008_phone_approval) — otherwise a firm
+  // could add a stranger's number and be paid for that stranger's orders. The
+  // primary md_phone is trusted directly (it came off the referral form and
+  // through the §9.2 duplicate check), so this filter never loses it.
   const { data: extraPhones, error: extraErr } = await db
     .from('referral_phone')
     .select('phone, referral_id')
-    .eq('status', 'approved')
+    .eq('approval_status', 'approved')
     .in('phone', [...phones])
   if (extraErr) {
     return NextResponse.json({ error: `referral_phone lookup failed: ${extraErr.message}` }, { status: 500 })

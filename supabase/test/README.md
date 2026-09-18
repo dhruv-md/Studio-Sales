@@ -36,7 +36,7 @@ exists` and inflated row counts, not as a clear error.
 
 ## What `rlstest.js` asserts
 
-**215 checks, in twenty-six groups.** Groups 16–20 were added with `005_studio.sql`
+**221 checks, in twenty-seven groups.** Groups 16–20 were added with `005_studio.sql`
 and cover escalations and their internal-note split, the referral decision guard
 and Appendix B's reason codes, the phone-reveal log, and notification
 preferences.
