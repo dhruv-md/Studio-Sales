@@ -623,6 +623,7 @@ export type StudioProject = {
   client_phone: string | null
   cover_url: string | null
   share_token: string | null
+  is_deleted: boolean
   created_at: string
   updated_at: string
 }
@@ -633,6 +634,7 @@ export type StudioProjectSpace = {
   name: string
   sort_order: number
   share_token: string | null
+  is_deleted: boolean
   created_at: string
 }
 

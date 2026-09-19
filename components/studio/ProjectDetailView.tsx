@@ -1,25 +1,25 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  Copy, ExternalLink, FileDown, Layers, Link2, Plus, ShoppingBag, Trash2, Upload,
+  Copy, FileDown, Layers, Link2, Plus, ShoppingBag, Trash2, Upload, X,
 } from 'lucide-react'
 import type { StudioProject, StudioProjectItem, StudioProjectSpace, StudioProjectTemplate, StudioItemKind } from '@/lib/domain/types'
 import {
   Badge, Button, Card, CardHead, Empty, Field, Input, Problem, Select,
 } from '@/components/ui'
 import { Modal } from '@/components/ui/Modal'
-import { Uploader } from '@/components/shell/Uploader'
 import { PageHead } from '@/components/shell/PageHead'
 import {
-  addStudioItem, createStudioSpace, deleteStudioItem, deleteStudioSpace, ensureProjectShareToken,
-  ensureSpaceShareToken,
+  addStudioItem, createStudioSpace, deleteStudioItem, deleteStudioProject, deleteStudioSpace,
+  ensureProjectShareToken, ensureSpaceShareToken,
 } from '@/lib/data/actions'
+import { decodeInspoItemUrl } from '@/lib/inspiration-link'
 import { studioPdf } from '@/lib/studio/pdf'
 import { EV, track } from '@/lib/analytics/track'
 
-const PALETTE_URL = 'https://palette.materialdepot.com'
 
 export function ProjectDetailView({
   project, spaces, items, template, firmName, logoUrl, errors,
@@ -39,9 +39,20 @@ export function ProjectDetailView({
   const [pending, start] = useTransition()
   const [exporting, setExporting] = useState(false)
   const [linkCopied, setLinkCopied] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const itemsBySpace = new Map<string, StudioProjectItem[]>()
   for (const it of items) itemsBySpace.set(it.space_id, [...(itemsBySpace.get(it.space_id) ?? []), it])
+
+  function removeProject() {
+    setError(null)
+    start(async () => {
+      const res = await deleteStudioProject(project.id)
+      if (!res.ok) return setError(res.error)
+      router.push('/projects')
+      router.refresh()
+    })
+  }
 
   function addSpace() {
     if (!spaceName.trim()) return
@@ -94,6 +105,13 @@ export function ProjectDetailView({
           <div className="flex items-center gap-1.5">
             <Button size="sm" onClick={shareProject}><Copy size={13} /> Get a link</Button>
             <Button size="sm" onClick={exportPdf} disabled={exporting}><FileDown size={13} /> {exporting ? 'Preparing…' : 'Download PDF'}</Button>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="rounded-md p-1.5 text-ink-faint transition hover:bg-bad-soft hover:text-bad"
+              aria-label="Delete project"
+            >
+              <Trash2 size={15} />
+            </button>
           </div>
         }
       />
@@ -120,7 +138,7 @@ export function ProjectDetailView({
         ) : (
           <>
             {spaces.map((s) => (
-              <SpaceSection key={s.id} space={s} items={itemsBySpace.get(s.id) ?? []} projectId={project.id} />
+              <SpaceSection key={s.id} space={s} items={itemsBySpace.get(s.id) ?? []} projectId={project.id} projectName={project.name} />
             ))}
             <Button onClick={() => setAddingSpace(true)}><Plus size={14} /> Add a space</Button>
           </>
@@ -138,36 +156,105 @@ export function ProjectDetailView({
           </div>
         </div>
       </Modal>
+
+      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Delete this project?">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-soft">
+            <span className="font-medium text-ink">{project.name}</span> and its spaces will be removed from your
+            Projects. This can be undone by Material Depot if you ask.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+            <Button variant="danger" disabled={pending} onClick={removeProject}>
+              {pending ? 'Deleting…' : 'Delete project'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }
 
-function SpaceSection({ space, items, projectId }: { space: StudioProjectSpace; items: StudioProjectItem[]; projectId: string }) {
+function SpaceSection({ space, items, projectId, projectName }: { space: StudioProjectSpace; items: StudioProjectItem[]; projectId: string; projectName: string }) {
   const router = useRouter()
   const [adding, setAdding] = useState(false)
   const [kind, setKind] = useState<StudioItemKind>('image')
   const [url, setUrl] = useState('')
+  const [file, setFile] = useState<File | null>(null)
   const [caption, setCaption] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
   const [pending, start] = useTransition()
+  const fileRef = useRef<HTMLInputElement>(null)
 
   function reset() {
     setAdding(false)
     setUrl('')
+    setFile(null)
     setCaption('')
     setKind('image')
   }
 
+  // Selecting a file only STAGES it — nothing uploads until Save. For an image
+  // we pre-validate to match the R2 endpoint (JPG/PNG/GIF/WebP, ≤10MB).
+  function pickFile(f: File) {
+    if (kind === 'image') {
+      const ext = f.name.includes('.') ? f.name.split('.').pop()!.toLowerCase() : ''
+      if (!['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+        return setError(`${f.name}: only JPG, PNG, GIF or WebP.`)
+      }
+      if (f.size > 10 * 1024 * 1024) return setError(`${f.name}: over 10MB.`)
+    }
+    setError(null)
+    setUrl('')
+    setFile(f)
+  }
+
+  /** Upload the staged file now (an image → R2 under projects/<project>/<space>/,
+   *  a video → the Supabase bucket), and return the stored URL. */
+  async function uploadStaged(f: File): Promise<string | null> {
+    const form = new FormData()
+    form.set('file', f)
+    if (kind === 'image') {
+      form.set('project_name', projectName)
+      form.set('subfolder', space.name)
+      const res = await fetch('/api/tools/project-images', { method: 'POST', body: form })
+      const body = await res.json()
+      if (!res.ok) {
+        setError(body.error || 'Upload failed.')
+        return null
+      }
+      const u = Array.isArray(body.images) ? body.images[0] : undefined
+      if (!u) {
+        setError('Upload succeeded but no URL came back.')
+        return null
+      }
+      return encodeURI(u as string) // folder names can contain spaces
+    }
+    const res = await fetch('/api/upload', { method: 'POST', body: form })
+    const body = await res.json()
+    if (!res.ok) {
+      setError(body.error || 'Upload failed.')
+      return null
+    }
+    return body.url as string
+  }
+
   function save() {
-    if (!url.trim()) return setError('Add a link, or upload a file first.')
+    if (!file && !url.trim()) return setError('Select an image, or paste a link first.')
     setError(null)
     start(async () => {
+      let finalUrl = url.trim()
+      if (file) {
+        const uploaded = await uploadStaged(file)
+        if (!uploaded) return // uploadStaged already set the error
+        finalUrl = uploaded
+      }
       const res = await addStudioItem({
         space_id: space.id,
         project_id: projectId,
         kind,
-        url,
+        url: finalUrl,
         caption,
         source: kind === 'palette_link' ? 'palette' : kind === 'image' || kind === 'video' ? 'upload' : 'manual',
       })
@@ -229,12 +316,22 @@ function SpaceSection({ space, items, projectId }: { space: StudioProjectSpace; 
       {error ? <div className="px-4 pt-3"><Problem title="Could not save" detail={error} /></div> : null}
       {linkCopied ? <p className="px-4 pt-2 text-[11px] text-good">Link copied.</p> : null}
       {items.length === 0 ? (
-        <Empty title="Nothing saved here yet" body="Upload a photo, paste a Palette link, or drop a product URL." />
+        <Empty title="Nothing saved here yet" body="Add a photo, or save one from the Inspiration tab." />
       ) : (
         <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4">
-          {items.map((item) => (
+          {items.map((item) => {
+            // An image saved from Inspiration carries its handle in a URL
+            // fragment; render it as a card that opens the inspiration detail,
+            // exactly like clicking it in the gallery.
+            const insp = item.kind === 'image' ? decodeInspoItemUrl(item.url) : null
+            return (
             <div key={item.id} className="group relative overflow-hidden rounded-lg border border-line bg-raised">
-              {item.kind === 'image' ? (
+              {insp ? (
+                <Link href={insp.href} className="block aspect-square">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={insp.imageSrc} alt={item.caption ?? ''} className="size-full object-cover transition-transform group-hover:scale-105" />
+                </Link>
+              ) : item.kind === 'image' ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={item.url} alt={item.caption ?? ''} className="aspect-square size-full object-cover" />
               ) : item.kind === 'video' ? (
@@ -259,42 +356,53 @@ function SpaceSection({ space, items, projectId }: { space: StudioProjectSpace; 
                 <Trash2 size={12} />
               </button>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
       <Modal open={adding} onClose={reset} title={`Add to ${space.name}`}>
         <div className="space-y-3">
           <Field label="What are you adding">
-            <Select value={kind} onChange={(e) => { setKind(e.target.value as StudioItemKind); setUrl('') }}>
+            <Select value={kind} onChange={(e) => { setKind(e.target.value as StudioItemKind); setUrl(''); setFile(null) }}>
               <option value="image">A photo</option>
-              <option value="video">A short video</option>
-              <option value="palette_link">A saved link from Palette</option>
-              <option value="product_link">A product link</option>
+              <option value="product_link">A link</option>
             </Select>
           </Field>
 
-          {kind === 'image' || kind === 'video' ? (
-            <Field label="File">
-              <div className="flex items-center gap-2">
-                <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Or paste a URL" />
-                <Uploader
-                  accept={kind === 'image' ? 'image/*' : 'video/mp4,video/quicktime,video/webm'}
-                  onUploaded={setUrl}
-                  onError={setError}
-                  label="Upload"
-                />
-              </div>
+          {kind === 'image' ? (
+            <Field label="File" hint="Selecting a file stages it — it uploads when you press Save.">
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".jpg,.jpeg,.png,.gif,.webp"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) pickFile(f)
+                  if (fileRef.current) fileRef.current.value = ''
+                }}
+              />
+              {file ? (
+                <div className="flex items-center gap-2 rounded-lg border border-line bg-raised px-3 py-2">
+                  <span className="flex-1 truncate text-sm text-ink">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFile(null)}
+                    className="rounded-md p-1 text-ink-faint transition hover:text-ink"
+                    aria-label="Remove file"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <Button type="button" onClick={() => fileRef.current?.click()}>
+                  <Upload size={14} /> Select image
+                </Button>
+              )}
             </Field>
           ) : (
-            <Field
-              label={kind === 'palette_link' ? 'Palette link' : 'Product link'}
-              hint={kind === 'palette_link' ? (
-                <span>
-                  Browse <a href={PALETTE_URL} target="_blank" rel="noreferrer" className="text-brand hover:underline inline-flex items-center gap-0.5">palette.materialdepot.com <ExternalLink size={10} /></a> and paste what you find.
-                </span>
-              ) : 'From Material Depot or anywhere else.'}
-            >
+            <Field label="Link" hint="From Material Depot or anywhere else.">
               <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
             </Field>
           )}
@@ -305,7 +413,9 @@ function SpaceSection({ space, items, projectId }: { space: StudioProjectSpace; 
 
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={reset}>Cancel</Button>
-            <Button variant="primary" disabled={pending || !url.trim()} onClick={save}>Save</Button>
+            <Button variant="primary" disabled={pending || (!file && !url.trim())} onClick={save}>
+              {pending ? (file ? 'Uploading…' : 'Saving…') : 'Save'}
+            </Button>
           </div>
         </div>
       </Modal>

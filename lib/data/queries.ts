@@ -150,14 +150,48 @@ export const listVisitRequests = (referralIds: string[]) =>
 // ------------------------------------------------------- studio projects
 
 export const listStudioProjects = () =>
-  many<StudioProject>((sb) => sb.from('studio_project').select('*').order('updated_at', { ascending: false }), 'your projects')
+  many<StudioProject>(
+    (sb) => sb.from('studio_project').select('*').eq('is_deleted', false).order('updated_at', { ascending: false }),
+    'your projects',
+  )
 
 export const getStudioProject = (id: string) =>
-  one<StudioProject>((sb) => sb.from('studio_project').select('*').eq('id', id).maybeSingle(), 'this project')
+  one<StudioProject>(
+    (sb) => sb.from('studio_project').select('*').eq('id', id).eq('is_deleted', false).maybeSingle(),
+    'this project',
+  )
+
+/**
+ * The cover for each project's card: its first saved image. We no longer ask
+ * for a cover on create — the earliest image item in any of the project's
+ * (live) spaces stands in. One query for the whole list, RLS-scoped to the
+ * firm; grouped in memory to the first image per project.
+ */
+export const listProjectCovers = async (): Promise<Result<Record<string, string>>> => {
+  const sb = await supabaseServer()
+  const { data, error } = await sb
+    .from('studio_project_item')
+    .select('url, created_at, space:studio_project_space!inner(project_id, is_deleted)')
+    .eq('kind', 'image')
+    .order('created_at', { ascending: true })
+  if (error) return fail(`Could not load project covers: ${error.message}`)
+
+  type Sp = { project_id: string; is_deleted: boolean }
+  type Row = { url: string; space: Sp | Sp[] | null }
+  const covers: Record<string, string> = {}
+  for (const row of (data ?? []) as unknown as Row[]) {
+    const sp = Array.isArray(row.space) ? row.space[0] : row.space
+    const pid = sp?.project_id
+    if (!pid || sp?.is_deleted || covers[pid]) continue
+    // An inspiration image carries its handle in a fragment — strip it for the cover.
+    covers[pid] = row.url.split('#')[0]
+  }
+  return ok(covers)
+}
 
 export const listStudioSpaces = (projectId: string) =>
   many<StudioProjectSpace>(
-    (sb) => sb.from('studio_project_space').select('*').eq('project_id', projectId).order('sort_order').order('created_at'),
+    (sb) => sb.from('studio_project_space').select('*').eq('project_id', projectId).eq('is_deleted', false).order('sort_order').order('created_at'),
     'the spaces on this project',
   )
 
