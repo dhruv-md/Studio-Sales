@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   Award, Building2, ClipboardCheck, FolderKanban, GalleryVerticalEnd, LayoutDashboard,
-  Layers, Palette, PackageSearch, PhoneCall, Settings, ShieldCheck, UserPlus, Users, UsersRound,
+  Layers, Lightbulb, Palette, PackageSearch, PhoneCall, Settings, ShieldCheck, UserPlus, Users, UsersRound,
 } from 'lucide-react'
 import type { Partner, StaffRole } from '@/lib/domain/types'
 
@@ -30,6 +30,7 @@ const PARTNER_CORE: NavItem[] = [
   { href: '/referrals', label: 'Clients', icon: Building2, blurb: 'Who you referred, and what they did' },
   { href: '/projects', label: 'Projects', icon: Palette, blurb: 'Mood boards and inspiration' },
   { href: '/portfolio', label: 'Portfolio', icon: GalleryVerticalEnd, blurb: 'Your work, on our site' },
+  { href: '/inspiration', label: 'Inspiration', icon: Lightbulb, blurb: 'Ideas and looks to draw from' },
   { href: '/rewards', label: 'Rewards', icon: Award, blurb: 'Your incentive ladder' },
   { href: '/settings', label: 'Settings', icon: Settings, blurb: 'Your studio, your team, your theme' },
 ]

@@ -9,15 +9,15 @@ import {
   Button, Card, Empty, Field, Input, Problem, Select, Textarea,
 } from '@/components/ui'
 import { Modal } from '@/components/ui/Modal'
-import { Uploader } from '@/components/shell/Uploader'
 import { createStudioProject } from '@/lib/data/actions'
 
 type ClientMode = 'none' | 'referred' | 'manual'
 
 export function ProjectsListView({
-  projects, referrals, referralsError,
+  projects, covers, referrals, referralsError,
 }: {
   projects: StudioProject[]
+  covers: Record<string, string>
   referrals: Referral[]
   referralsError?: string | null
 }) {
@@ -25,7 +25,6 @@ export function ProjectsListView({
   const [adding, setAdding] = useState(false)
   const [clientMode, setClientMode] = useState<ClientMode>('none')
   const [projectType, setProjectType] = useState<'residential' | 'commercial' | 'other'>('residential')
-  const [coverUrl, setCoverUrl] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
@@ -39,14 +38,12 @@ export function ProjectsListView({
         project_type_other: projectType === 'other' ? String(form.get('project_type_other') ?? '') : null,
         city: String(form.get('city') ?? ''),
         society: String(form.get('society') ?? ''),
-        cover_url: coverUrl,
         referral_id: clientMode === 'referred' ? String(form.get('referral_id') ?? '') || null : null,
         client_name: clientMode === 'manual' ? String(form.get('client_name') ?? '') : null,
         client_phone: clientMode === 'manual' ? String(form.get('client_phone') ?? '') : null,
       })
       if (!res.ok) return setError(res.error)
       setAdding(false)
-      setCoverUrl('')
       setClientMode('none')
       router.push(`/projects/${res.data.id}`)
     })
@@ -76,11 +73,11 @@ export function ProjectsListView({
             <Link key={p.id} href={`/projects/${p.id}`} className="block">
               <Card className="overflow-hidden transition hover:border-line-strong">
                 <div className="aspect-[4/3] bg-raised">
-                  {p.cover_url ? (
+                  {covers[p.id] || p.cover_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.cover_url} alt={p.name} className="size-full object-cover" />
+                    <img src={covers[p.id] || p.cover_url!} alt={p.name} className="size-full object-cover" />
                   ) : (
-                    <div className="flex size-full items-center justify-center text-xs text-ink-faint">No cover yet</div>
+                    <div className="flex size-full items-center justify-center text-xs text-ink-faint">No images yet</div>
                   )}
                 </div>
                 <div className="px-3 py-2.5">
@@ -115,13 +112,6 @@ export function ProjectsListView({
           </div>
           {projectType === 'other' ? <Field label="City"><Input name="city" /></Field> : null}
           <Field label="Society / building"><Input name="society" /></Field>
-
-          <Field label="Cover picture">
-            <div className="flex items-center gap-2">
-              <Input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="https://… or upload" />
-              <Uploader onUploaded={setCoverUrl} onError={setError} label="Upload" />
-            </div>
-          </Field>
 
           <Field label="Client">
             <Select value={clientMode} onChange={(e) => setClientMode(e.target.value as ClientMode)}>

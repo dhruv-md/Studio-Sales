@@ -1065,8 +1065,10 @@ export async function updateStudioProject(id: string, values: Row) {
   return update('studio_project', id, { ...values, updated_at: new Date().toISOString() }, 'this project', `/projects/${id}`)
 }
 
+/** Soft delete — sets `is_deleted` so the project drops out of every read but
+ *  its spaces and saved inspiration are recoverable (009_soft_delete). */
 export async function deleteStudioProject(id: string) {
-  return remove('studio_project', id, 'this project', '/projects')
+  return update('studio_project', id, { is_deleted: true }, 'this project', '/projects')
 }
 
 export async function createStudioSpace(projectId: string, name: string) {
@@ -1081,8 +1083,9 @@ export async function renameStudioSpace(id: string, projectId: string, name: str
   return update('studio_project_space', id, { name: name.trim() }, 'this space', `/projects/${projectId}`)
 }
 
+/** Soft delete — see deleteStudioProject. */
 export async function deleteStudioSpace(id: string, projectId: string) {
-  return remove('studio_project_space', id, 'this space', `/projects/${projectId}`)
+  return update('studio_project_space', id, { is_deleted: true }, 'this space', `/projects/${projectId}`)
 }
 
 /**

@@ -1,4 +1,4 @@
-import { listReferrals, listStudioProjects } from '@/lib/data/queries'
+import { listProjectCovers, listReferrals, listStudioProjects } from '@/lib/data/queries'
 import { ProjectsListView } from '@/components/studio/ProjectsListView'
 import { PageHead } from '@/components/shell/PageHead'
 import { Problem } from '@/components/ui'
@@ -9,7 +9,11 @@ import { Problem } from '@/components/ui'
  * live at this URL (now `/workspace/projects`) — see `docs/projects.md`.
  */
 export default async function StudioProjectsPage() {
-  const [projects, referrals] = await Promise.all([listStudioProjects(), listReferrals()])
+  const [projects, referrals, covers] = await Promise.all([
+    listStudioProjects(),
+    listReferrals(),
+    listProjectCovers(),
+  ])
 
   return (
     <>
@@ -20,6 +24,7 @@ export default async function StudioProjectsPage() {
         ) : (
           <ProjectsListView
             projects={projects.data}
+            covers={covers.ok ? covers.data : {}}
             referrals={referrals.ok ? referrals.data : []}
             referralsError={referrals.ok ? null : referrals.error}
           />

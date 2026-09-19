@@ -5,7 +5,7 @@
   "scripts": {
     "pg:start": "node pg.js start",
     "pg:stop": "node pg.js stop",
-    "migrate": "node run.js shim.sql ../migrations/001_init.sql ../migrations/002_rls.sql ../migrations/003_roles.sql ../migrations/004_roles_rls.sql ../migrations/005_studio.sql ../migrations/006_credentials.sql ../migrations/007_studio_v2.sql ../migrations/008_phone_approval.sql",
+    "migrate": "node run.js shim.sql ../migrations/001_init.sql ../migrations/002_rls.sql ../migrations/003_roles.sql ../migrations/004_roles_rls.sql ../migrations/005_studio.sql ../migrations/006_credentials.sql ../migrations/007_studio_v2.sql ../migrations/008_phone_approval.sql ../migrations/009_soft_delete.sql",
     "seed": "node run.js user.sql ../seed/001_demo.sql ../seed/002_console.sql",
     "rls": "node rlstest.js",
     "all": "npm run pg:start && npm run migrate && npm run seed && npm run rls"
